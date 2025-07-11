@@ -190,7 +190,7 @@
           "tdrive": {
             "files": {
               "editor": {
-                "edition_url": "http://localhost:5000/plugins/onlyoffice/",
+                "edition_url": "http://localhost:5000/",
                 "empty_files": [
                   {
                     "filename": "Untitled.docx",
@@ -222,7 +222,7 @@
                   "html",
                   "csv"
                 ],
-                "preview_url": "http://localhost:5000/plugins/onlyoffice/?preview=1"
+                "preview_url": "http://localhost:5000/?preview=1"
               }
             },
             "version": 1
@@ -239,7 +239,7 @@
           "name": "Only Office",
           "website": "http://twake.app/"
         },
-        "internal_domain": "http://localhost:5000/"
+        "internal_domain": "http://localhost:8090/"
       }
     ]
   },

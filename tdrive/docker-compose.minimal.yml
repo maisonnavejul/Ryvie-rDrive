@@ -65,8 +65,8 @@ services:
       - SSL_CERTS=off
       - NODE_HOST=http://node:4000
     ports:
-      - 80:80
-      - 443:443
+      - 8080:80
+      - 8443:443
     depends_on:
       node:
         condition: service_healthy
