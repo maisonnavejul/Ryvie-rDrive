@@ -209,10 +209,23 @@ class Login extends Observable {
   async logout(reload = false) {
     this.resetCurrentUser();
     Application.stop();
-
+    
     document.body.classList.add('fade_out');
 
-    await AuthService.logout(reload);
+    try {
+      // Forcer reload à false pour éviter la boucle de rechargement infini
+      await AuthService.logout(false);
+      
+      // Rediriger manuellement vers la page de login sans rechargement
+      const loginPath = RouterServices.pathnames.LOGIN;
+      if (window.location.pathname !== loginPath) {
+        RouterServices.push(loginPath);
+      }
+    } catch (error) {
+      this.logger.error('Erreur pendant la déconnexion:', error);
+      // En cas d'erreur, on redirige quand même vers la page de login
+      RouterServices.push(RouterServices.pathnames.LOGIN);
+    }
   }
 
   setCurrentUser(user: UserType) {
