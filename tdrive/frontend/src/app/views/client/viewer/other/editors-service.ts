@@ -4,6 +4,7 @@ import { Application } from '@features/applications/types/application';
 import jwtStorageService from '@features/auth/jwt-storage-service';
 import useRouterCompany from '@features/router/hooks/use-router-company';
 import useRouterWorkspace from '@features/router/hooks/use-router-workspace';
+import environment from '@environment/environment';
 
 type EditorType = {
   url?: string;
@@ -75,29 +76,25 @@ export const useEditors = (
 
   const getFileUrl = (url: string, file_id: string, drive_id?: string): string => {
     const jwt = jwtStorageService.getJWT();
+    // Récupérer l'URL publique du connecteur OnlyOffice depuis les variables d'environnement
+    const connectorUrl = process.env.REACT_APP_ONLYOFFICE_CONNECTOR_URL || 'https://connector.rdrive.test.jules.ryvie.fr';
 
     if (!url) return '';
     
-    // Vérifier si l'URL pointe vers le connecteur OnlyOffice et assurer le préfixe
-    if (url.includes(':5000') || url.includes('connector')) {
-      // Nettoyer complètement l'URL pour éviter les problèmes
-      // Extraire uniquement le protocole et le domaine sans aucun paramètre ou chemin existant
-      const urlParts = url.match(/^(https?:\/\/[^\/?#]+)/i);
-      const baseUrl = urlParts ? urlParts[1] : url.split('?')[0].replace(/\/*$/, '');
-      
-      console.log('URL de base extraite:', baseUrl);
-      
+    // Vérifier si l'URL pointe vers le connecteur OnlyOffice
+    if (url.includes(':5000') || url.includes('localhost') || url.includes('connector')) {
       // Déterminer si c'est pour une prévisualisation ou édition
       const isPreview = !drive_id && preview_candidate.length > 0 && preview_candidate[0].url === url;
       
-      // Construire l'URL proprement
-      url = `${baseUrl}/plugins/onlyoffice`;
+      // Construire l'URL en utilisant l'URL publique du connecteur
+      console.log('Remplacement de l\'URL locale par l\'URL publique:', connectorUrl);
+      url = `${connectorUrl}/plugins/onlyoffice`;
       
       if (isPreview) {
         url += '?preview=1';
-        console.log('URL de prévisualisation construite:', url);
+        console.log('URL de prévisualisation construite avec URL publique:', url);
       } else {
-        console.log('URL d\'édition construite:', url);
+        console.log('URL d\'édition construite avec URL publique:', url);
       }
     }
 
