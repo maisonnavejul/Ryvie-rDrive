@@ -1,0 +1,15 @@
+version: "3.4"
+
+services:
+  onlyoffice-connector:
+    environment:
+      # Configuration pour accepter les requêtes via sous-domaine HTTPS
+      - SERVER_ORIGIN=https://connector.rdrive.test.jules.ryvie.fr
+      - CREDENTIALS_ENDPOINT=https://backend.rdrive.test.jules.ryvie.fr/
+      - ONLY_OFFICE_SERVER=https://document.rdrive.test.jules.ryvie.fr/
+      # Conserver la même clé secrète
+      - CREDENTIALS_ID=tdrive_onlyoffice
+      - CREDENTIALS_SECRET=c1cc66db78e1d3bb4713c55d5ab2
+      # Restaurer le préfixe original qui fonctionnait
+      - SERVER_PREFIX=/plugins/onlyoffice/
+      - SERVER_PORT=5000

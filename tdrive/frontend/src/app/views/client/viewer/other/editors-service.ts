@@ -77,6 +77,29 @@ export const useEditors = (
     const jwt = jwtStorageService.getJWT();
 
     if (!url) return '';
+    
+    // Vérifier si l'URL pointe vers le connecteur OnlyOffice et assurer le préfixe
+    if (url.includes(':5000') || url.includes('connector')) {
+      // Nettoyer complètement l'URL pour éviter les problèmes
+      // Extraire uniquement le protocole et le domaine sans aucun paramètre ou chemin existant
+      const urlParts = url.match(/^(https?:\/\/[^\/?#]+)/i);
+      const baseUrl = urlParts ? urlParts[1] : url.split('?')[0].replace(/\/*$/, '');
+      
+      console.log('URL de base extraite:', baseUrl);
+      
+      // Déterminer si c'est pour une prévisualisation ou édition
+      const isPreview = !drive_id && preview_candidate.length > 0 && preview_candidate[0].url === url;
+      
+      // Construire l'URL proprement
+      url = `${baseUrl}/plugins/onlyoffice`;
+      
+      if (isPreview) {
+        url += '?preview=1';
+        console.log('URL de prévisualisation construite:', url);
+      } else {
+        console.log('URL d\'édition construite:', url);
+      }
+    }
 
     return `${url}${
       url.indexOf('?') > 0 ? '&' : '?'
