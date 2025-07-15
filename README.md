@@ -17,8 +17,7 @@
   <a href="https:">Roadmap</a>
 </p>
 
-<h2>About</h2>
-<img width="100%" alt="booking-screen" src="" />
+
 
 <hr />
 
