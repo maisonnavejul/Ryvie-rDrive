@@ -18,6 +18,7 @@ import FeatureTogglesService, {
   FeatureNames,
 } from '@features/global/services/feature-toggles-service';
 import Logger from '@features/global/framework/logger-service';
+import jwtStorageService from '@features/auth/jwt-storage-service';
 
 /**
  * Returns the children of a drive item
@@ -35,27 +36,83 @@ export const useDriveActions = (inPublicSharing?: boolean) => {
    * Downloads a file from the given URL, ensuring compatibility across all browsers, including Safari.
    *
    * @param fileUrl - The URL of the file to download.
+   * @param fileName - The name of the file to download.
    */
-  const downloadFile = (fileUrl: string) => {
+  const downloadFile = (fileUrl: string, fileName?: string) => {
     try {
-      // Attempt to open the URL in a new tab
-      const popupWindow = window.open(fileUrl, '_blank');
+      // Afficher une notification que le téléchargement est en préparation
+      const messageText = fileName 
+        ? Languages.t('hooks.use-drive-actions.preparing_file_with_name', [fileName]) 
+        : Languages.t('hooks.use-drive-actions.preparing_file');
+      
+      // Utiliser message.loading qui retourne une fonction pour fermer le message
+      const hideLoading = ToasterService.loading(messageText, 0);
+      
+      // Récupérer le JWT et créer l'en-tête d'autorisation
+      const jwt = jwtStorageService.getJWT();
+      const authHeader = `Bearer ${jwt}`;
 
-      if (popupWindow) {
-        popupWindow.focus();
-      } else {
-        // Fallback for Safari or blocked pop-ups
-        const downloadLink = document.createElement('a');
-        downloadLink.href = fileUrl;
-        downloadLink.download = ''; // Suggests a download instead of navigation
-        downloadLink.target = '_self'; // Ensures it opens in the same tab
-
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-      }
-    } catch (error) {
-      Logger.error('Error during file download:', error);
+      // Utiliser fetch avec les en-têtes d'authentification et les cookies
+      fetch(fileUrl, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          Authorization: authHeader,
+        },
+      })
+        .then(response => {
+          if (!response.ok) {
+            // Fermer la notification en cas d'erreur
+            hideLoading();
+            throw new Error(`Erreur HTTP: ${response.status}`);
+          }
+          
+          // Extraire le nom du fichier de l'en-tête Content-Disposition s'il existe
+          let extractedFileName = fileName;
+          const contentDisposition = response.headers.get('Content-Disposition');
+          if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (filenameMatch && filenameMatch[1]) {
+              extractedFileName = filenameMatch[1].replace(/['"]/g, '');
+            }
+          }
+          
+          // Utiliser le nom fourni, extrait ou généré à partir de l'URL
+          if (!extractedFileName) {
+            extractedFileName = fileUrl.split('/').pop()?.split('?')[0] || 'download';
+          }
+          
+          return response.blob().then(blob => ({ blob, fileName: extractedFileName }));
+        })
+        .then(({ blob, fileName }) => {
+          const url = window.URL.createObjectURL(blob);
+          const downloadLink = document.createElement('a');
+          downloadLink.href = url;
+          
+          // Utiliser le nom du fichier correct (avec valeur par défaut pour éviter undefined)
+          downloadLink.download = fileName || 'download';
+          
+          document.body.appendChild(downloadLink);
+          downloadLink.click();
+          document.body.removeChild(downloadLink);
+          window.URL.revokeObjectURL(url);
+          
+          // Fermer la notification de préparation et afficher une notification de succès
+          hideLoading();
+          ToasterService.success(
+            fileName 
+              ? Languages.t('hooks.use-drive-actions.download_complete_with_name', [fileName])
+              : Languages.t('hooks.use-drive-actions.download_complete')
+          );
+        })
+        .catch(error => {
+          // Fermer la notification en cas d'erreur
+          hideLoading();
+          Logger.error('Erreur lors du téléchargement:', error);
+          ToasterService.error(Languages.t('hooks.use-drive-actions.unable_download_file'));
+        });
+    } catch (e) {
+      ToasterService.error(Languages.t('hooks.use-drive-actions.unable_download_file'));
     }
   };
 
@@ -174,9 +231,93 @@ export const useDriveActions = (inPublicSharing?: boolean) => {
   const downloadZip = useCallback(
     async (ids: string[], isDirectory = false, containsMalicious = false) => {
       try {
+        Logger.debug('Téléchargement ZIP demandé:', { ids, isDirectory });
+        
         const triggerDownload = async () => {
+          Logger.debug('Lancement du téléchargement ZIP');
+          
+          // Déterminer un nom de fichier approprié pour le ZIP
+          let zipFileName = 'archive.zip';
+          let displayName = 'archive';
+          let hideLoading: () => void = () => {};
+          
+          if (ids.length === 1) {
+            // Si c'est un seul dossier/fichier, on utilise son nom
+            try {
+              const itemDetails = await DriveApiClient.get(companyId, ids[0]);
+              // Accéder au nom en utilisant la structure correcte de DriveItemDetails
+              if (itemDetails && itemDetails.item && itemDetails.item.name) {
+                displayName = itemDetails.item.name;
+                zipFileName = `${displayName}.zip`;
+              }
+            } catch (e) {
+              Logger.error('Erreur lors de la récupération des détails du dossier:', e);
+            }
+          } else if (ids.length > 1) {
+            displayName = Languages.t('hooks.use-drive-actions.multiple_files', [ids.length]);
+          }
+          
+          // Afficher une notification de préparation du téléchargement
+          const messageText = isDirectory 
+            ? Languages.t('hooks.use-drive-actions.preparing_folder_with_name', [displayName]) 
+            : Languages.t('hooks.use-drive-actions.preparing_files_with_count', [ids.length]);
+          
+          hideLoading = ToasterService.loading(messageText, 0);
+          
+          Logger.debug('Téléchargement du ZIP avec nom:', zipFileName);
+          
+          // Obtenir l'URL de téléchargement
           const url = await DriveApiClient.getDownloadZipUrl(companyId, ids, isDirectory);
-          downloadFile(url);
+          
+          // Télécharger le ZIP avec le nom approprié (sans notifications car on les gère ici)
+          try {
+            // Récupérer le JWT et créer l'en-tête d'autorisation
+            const jwt = jwtStorageService.getJWT();
+            const authHeader = `Bearer ${jwt}`;
+
+            // Utiliser fetch avec les en-têtes d'authentification et les cookies
+            fetch(url, {
+              method: 'GET',
+              credentials: 'include',
+              headers: {
+                Authorization: authHeader,
+              },
+            })
+              .then(response => {
+                if (!response.ok) {
+                  hideLoading();
+                  throw new Error(`Erreur HTTP: ${response.status}`);
+                }
+                return response.blob();
+              })
+              .then(blob => {
+                const objectUrl = window.URL.createObjectURL(blob);
+                const downloadLink = document.createElement('a');
+                downloadLink.href = objectUrl;
+                downloadLink.download = zipFileName;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                window.URL.revokeObjectURL(objectUrl);
+                
+                // Fermer la notification de préparation et afficher une notification de succès
+                hideLoading();
+                ToasterService.success(
+                  isDirectory 
+                    ? Languages.t('hooks.use-drive-actions.download_folder_complete', [displayName])
+                    : Languages.t('hooks.use-drive-actions.download_files_complete', [ids.length])
+                );
+              })
+              .catch(error => {
+                hideLoading();
+                Logger.error('Erreur lors du téléchargement ZIP:', error);
+                ToasterService.error(Languages.t('hooks.use-drive-actions.unable_download_file'));
+              });
+          } catch (e) {
+            hideLoading();
+            Logger.error('Erreur lors du téléchargement ZIP:', e);
+            ToasterService.error(Languages.t('hooks.use-drive-actions.unable_download_file'));
+          }
         };
         if (AVEnabled) {
           const containsMaliciousFiles =

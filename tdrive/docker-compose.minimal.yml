@@ -55,4 +55,24 @@ services:
       node_create_user:
         condition: service_completed_successfully
   
-  
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/tdrive-frontend/Dockerfile
+    container_name: tdrive-frontend
+    environment:
+      - DEV=production
+      - SSL_CERTS=off
+      - NODE_HOST=http://node:4000
+    ports:
+      - 3000:80
+      - 8443:443
+    depends_on:
+      node:
+        condition: service_healthy
+    volumes:
+      - ./docker-data/logs/nginx/:/var/log/nginx
+      - ./docker-data/letsencrypt/:/etc/letsencrypt/
+      - ./docker-data/drive-preview/:/tdrive-core/web/medias/
+      - ./docker-data/uploads/:/tdrive-core/web/upload/
+      - ./docker-data/ssl:/etc/nginx/ssl

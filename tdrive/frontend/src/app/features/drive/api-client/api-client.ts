@@ -11,6 +11,8 @@ import {
 import Workspace from '@deprecated/workspaces/workspaces';
 import Logger from 'features/global/framework/logger-service';
 import { JWTDataType } from 'app/features/auth/jwt-storage-service';
+import jwtStorageService from '@features/auth/jwt-storage-service';
+
 export interface BaseSearchOptions {
   company_id?: string;
   workspace_id?: string;
@@ -164,19 +166,34 @@ export class DriveApiClient {
   }
 
   static getDownloadUrl(companyId: string, id: string, versionId?: string) {
-    if (versionId)
-      return Api.route(
-        `/internal/services/documents/v1/companies/${companyId}/item/${id}/download?version_id=${versionId}`,
-      );
-    return Api.route(`/internal/services/documents/v1/companies/${companyId}/item/${id}/download`);
+    const jwt = jwtStorageService.getJWT();
+    let url;
+    
+    if (versionId) {
+      url = Api.route(`/internal/services/documents/v1/companies/${companyId}/item/${id}/download?version_id=${versionId}`);
+    } else {
+      url = Api.route(`/internal/services/documents/v1/companies/${companyId}/item/${id}/download`);
+    }
+    
+    // Ajouter le token JWT à l'URL pour résoudre le problème d'authentification 401
+    return `${url}${url.includes('?') ? '&' : '?'}token=${jwt}`;
   }
 
   static async getDownloadZipUrl(companyId: string, ids: string[], isDirectory?: boolean) {
-    // const { token } = await DriveApiClient.getDownloadToken(companyId, ids);
-    return Api.route(
+    const jwt = jwtStorageService.getJWT();
+    // Utiliser la méthode originale plutôt que de créer une nouvelle requête
+    const url = Api.route(
       `/internal/services/documents/v1/companies/${companyId}/item/download/zip` +
-        `?items=${ids.join(',')}&is_directory=${isDirectory}`,
+        `?items=${ids.join(',')}&is_directory=${isDirectory || false}`,
     );
+    
+    // Ajouter le token JWT à l'URL pour résoudre le problème d'authentification 401
+    const finalUrl = `${url}&token=${jwt}`;
+    
+    // Log pour debug
+    Logger.debug('Download ZIP URL:', finalUrl);
+    
+    return finalUrl;
   }
 
   static async search(searchString: string, view?: string, options?: BaseSearchOptions) {
