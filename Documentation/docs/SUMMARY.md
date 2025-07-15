@@ -20,6 +20,8 @@
   - [📄 Files](internal-documentation/backend-services/files/README.md)
     - [Database models](internal-documentation/backend-services/files/database-models.md)
     - [Resumable.js](internal-documentation/backend-services/files/resumablejs.md)
+    - [Download System](internal-documentation/backend-services/files/download-system.md)
+  - [📝 OnlyOffice Integration](internal-documentation/onlyoffice-integration.md)
   - [🛠 Twake Drive service development](internal-documentation/backend-services/intro/README.md)
     - [What is a service in Twake Drive ?](internal-documentation/backend-services/intro/start-working-into-a-service.md)
     - [Platform/Technical services](internal-documentation/backend-services/intro/platform/README.md)
