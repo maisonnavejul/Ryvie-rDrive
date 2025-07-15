@@ -1,4 +1,4 @@
-# Twake Drive
+# Ryvie rDrive
 <p align="center">
   <a href="https://github.com/linagora/twake-drive">
    <img src="ryvielogo.png" alt="Logo">
@@ -10,15 +10,15 @@
 
 <p align="center">
   <b>The open-source alternative to Google Drive.</b><br />
-  <a href="https://twake.app"><strong>Learn more »</strong></a><br /><br />
-  <a href="https://t.me/+HIWCtSkvTpxiNjcy">Telegram</a> |
-  <a href="https://twake-drive.com">Website</a> |
-  <a href="https://github.com/linagora/twake-drive/issues">Issues</a> |
-  <a href="https://github.com/linagora/twake-drive/milestones">Roadmap</a>
+  <a href="https:"><strong>Learn more »</strong></a><br /><br />
+  <a href="https:">Telegram</a> |
+  <a href="https:">Website</a> |
+  <a href="https:">Issues</a> |
+  <a href="https:">Roadmap</a>
 </p>
 
 <h2>About</h2>
-<img width="100%" alt="booking-screen" src="https://github.com/linagora/twake-drive/assets/14924963/e19079c6-99c4-41f5-83a2-b4ed4a8816d7" />
+<img width="100%" alt="booking-screen" src="" />
 
 <hr />
 
