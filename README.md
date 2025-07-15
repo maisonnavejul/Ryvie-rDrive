@@ -38,7 +38,7 @@ docker compose \
   </li>
   <li>
     <strong>Open the app</strong><br />
-    Visit <a href="http://localhost/">http://localhost/</a> in your browser.
+    Visit <a href="http://localhost:3000">http://localhost:3000</a> in your browser.
   </li>
 </ol>
 
