@@ -1,4 +1,5 @@
 import { Button } from '@atoms/button/button';
+import React, { useState } from 'react';
 import {
   ClockIcon,
   CloudIcon,
@@ -42,6 +43,7 @@ export default () => {
   if ((path || [])[0]?.id === 'user_' + user?.id) folderType = 'personal';
   if (inTrash) folderType = 'trash';
   if (sharedWithMe) folderType = 'shared';
+  const [connectingDropbox, setConnectingDropbox] = useState(false);
 
   useEffect(() => {
     !itemId && !dirId && viewId && setParentId(viewId);
@@ -171,24 +173,52 @@ export default () => {
           </>
         )}
         <Button
-          onClick={() => {
+          onClick={() =>
             history.push(
               RouterServices.generateRouteFromState({
                 companyId: company,
-                viewId: 'trash_' + user?.id,
-                itemId: '',
-                dirId: '',
+                viewId: 'trash',
+                dirId: undefined,
+                itemId: undefined,
               }),
-            );
-            // setParentId('trash_' + user?.id);
+            )
+          }
+          size="lg"
+          theme="white"
+          className={'w-full mb-1 ' + (folderType === 'trash' ? activeClass : '')}
+          testClassId="sidebar-menu-trash"
+        >
+          <TrashIcon className="w-5 h-5 mr-4" />{' '}
+          {Languages.t('components.side_menu.trash')}
+        </Button>
+
+        <Button
+          onClick={async () => {
+            setConnectingDropbox(true);
+            try {
+              const res = await fetch('http://localhost:4000/v1/drivers/Dropbox');
+              if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+              const js = await res.json();
+              window.location.href = js.addition.AuthUrl;
+            } catch (e) {
+              console.error('Dropbox connection error:', e);
+              setConnectingDropbox(false);
+            }
           }}
           size="lg"
           theme="white"
-          className={'w-full mb-1 ' + (viewId?.includes('trash') ? activeClass : '')}
-          testClassId="sidebar-menu-trash"
+          className="w-full mb-1"
+          testClassId="sidebar-dropbox-connect"
+          disabled={connectingDropbox}
         >
-          <TrashIcon className="w-5 h-5 mr-4 text-rose-500" />{' '}
-          {Languages.t('components.side_menu.trash')}
+          <img 
+            src="https://cfl.dropboxstatic.com/static/images/favicon-vfl8lUR9B.ico" 
+            alt="Dropbox" 
+            className="w-5 h-5 mr-4"
+          />
+          {connectingDropbox 
+            ? Languages.t('drive.dropbox.redirecting') 
+            : Languages.t('drive.dropbox.connect_button')}
         </Button>
 
         {false && (

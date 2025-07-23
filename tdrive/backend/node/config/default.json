@@ -262,6 +262,7 @@
     "database",
     "cron",
     "search",
+    "rclone",
     "message-queue",
     "tracker",
     "general",

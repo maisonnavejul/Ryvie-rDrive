@@ -335,7 +335,8 @@
     "scenes.apps.account.preference": "Preferences",
     "scenes.apps.account.thumbnail.max_weight": "Maximum size 5 MB",
     "scenes.apps.account.title": "Account parameters",
-    "scenes.apps.drive.download_button": "Download",
+    "scenes.apps.drive.dropbox.connect_button": "Connect your Dropbox",
+    "scenes.apps.drive.dropbox.redirecting": "Redirecting...",
     "scenes.apps.drive.viewer.edit_with_button": "Edit with {{$1}}",
     "scenes.apps.drive.viewer.open_with_button": "Open with...",
     "scenes.apps.messages.message.save_button": "Save",
@@ -383,5 +384,7 @@
     "services.console_services.toaster.success_verify_email": "A verification link has been sent to your email account",
     "services.file_upload_service.toaster.upload_file_error": "Error uploading file: {{$1}}",
     "services.user.notification_parameters_update_alert": "The notification settings have been updated.",
-    "services.user.update_password_alert": "Your password has been updated."
+    "services.user.update_password_alert": "Your password has been updated.",
+    "drive.dropbox.connect_button": "Connect your Dropbox",
+    "drive.dropbox.redirecting": "Redirecting..."
 }
