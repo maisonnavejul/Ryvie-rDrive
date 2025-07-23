@@ -46,11 +46,21 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
   async getAuthUrl(request?: any): Promise<string> {
     const redirectUri = encodeURIComponent(this.PROXY);
     
-    // Générer l'URL de callback dynamiquement comme dans le code Express
+    // Générer l'URL de callback dynamiquement pour pointer vers le backend
+    // mais en utilisant l'adresse accessible depuis l'extérieur
     let callbackBase = '/v1/recover/Dropbox';
     if (request) {
       const protocol = request.protocol || 'http';
-      const host = request.headers.host || 'localhost:4000';
+      let host = request.headers.host || 'localhost:4000';
+      
+      // Si l'host contient le port 4000 (backend), on le remplace par 4000
+      // pour s'assurer que le callback pointe vers le backend
+      if (host.includes(':3000')) {
+        host = host.replace(':3000', ':4000');
+      } else if (!host.includes(':')) {
+        host = `${host}:4000`;
+      }
+      
       callbackBase = `${protocol}://${host}/v1/recover/Dropbox`;
     }
     

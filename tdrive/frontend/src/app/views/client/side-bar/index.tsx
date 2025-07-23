@@ -196,10 +196,20 @@ export default () => {
           onClick={async () => {
             setConnectingDropbox(true);
             try {
-              const res = await fetch('http://localhost:4000/v1/drivers/Dropbox');
-              if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-              const js = await res.json();
-              window.location.href = js.addition.AuthUrl;
+              // Construire l'URL du backend dynamiquement
+              const backendUrl = window.location.protocol + '//' + window.location.hostname + ':4000';
+              const response = await fetch(`${backendUrl}/v1/drivers/Dropbox`);
+              
+              if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+              }
+              
+              const data = await response.json();
+              if (data && data.addition && data.addition.AuthUrl) {
+                window.location.href = data.addition.AuthUrl;
+              } else {
+                throw new Error('Invalid response format');
+              }
             } catch (e) {
               console.error('Dropbox connection error:', e);
               setConnectingDropbox(false);
