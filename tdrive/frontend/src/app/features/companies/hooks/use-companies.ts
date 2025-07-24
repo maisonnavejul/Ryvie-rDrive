@@ -1,6 +1,7 @@
 import { CompaniesState } from '../state/companies';
 import useRouterCompany from '../../router/hooks/use-router-company';
 import { useRecoilState } from 'recoil';
+import { useEffect } from 'react';
 import { CurrentUserState } from '../../users/state/atoms/current-user';
 import { CompanyType } from '@features/companies/types/company';
 import LocalStorage from '@features/global/framework/local-storage-service';
@@ -56,12 +57,14 @@ export const useCurrentCompany = () => {
     WorkspacesService.openNoCompaniesPage();
   }
 
-  //If there is nothing in router or company in router isn't available for the user, try to use the best candidate available
-  if (!routerCompanyId && bestCandidate) {
-    RouterService.push(RouterService.generateRouteFromState({ companyId: bestCandidate }));
-  }
-
   const [company, setCompany] = useRecoilState(CompaniesState(routerCompanyId));
+
+  //If there is nothing in router or company in router isn't available for the user, try to use the best candidate available
+  useEffect(() => {
+    if (!routerCompanyId && bestCandidate) {
+      RouterService.push(RouterService.generateRouteFromState({ companyId: bestCandidate }));
+    }
+  }, [routerCompanyId, bestCandidate]);
 
   const refresh = async () => {
     if (company) setCompany(await CompanyAPIClient.get(company.id));

@@ -162,6 +162,14 @@ export default class UploadZone extends React.Component<PropsType, StateType> {
     });
   }
 
+  componentWillUnmount() {
+    // Nettoyer le timeout pour éviter les memory leaks
+    if (this.stopHoverTimeout) {
+      clearTimeout(this.stopHoverTimeout);
+      this.stopHoverTimeout = undefined;
+    }
+  }
+
   /**
    *
    * @param state

@@ -231,6 +231,24 @@ export default () => {
             : Languages.t('drive.dropbox.connect_button')}
         </Button>
 
+        <Button
+          onClick={() => {
+            setParentId('dropbox_root');
+            history.push(`/client/${company}/v/dropbox_root`);
+          }}
+          size="lg"
+          theme="white"
+          className={`w-full mb-1 ${parentId === 'dropbox_root' || parentId.startsWith('dropbox_') ? activeClass : ''}`}
+          testClassId="sidebar-dropbox-browse"
+        >
+          <img 
+            src="https://cfl.dropboxstatic.com/static/images/favicon-vfl8lUR9B.ico" 
+            alt="Dropbox" 
+            className="w-5 h-5 mr-4"
+          />
+          My Dropbox
+        </Button>
+
         {false && (
           <>
             <div className="mt-4" />

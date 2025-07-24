@@ -88,10 +88,50 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
   }
 
   async listFiles(path: string): Promise<any[]> {
-    // Implémentation simple pour l'instant
-    // Dans une version complète, nous utiliserions l'authentification et les tokens stockés
-    logger.info(`Listing files at path: ${path}`);
-    return [];
+    logger.info(`📁 Listing files at path: ${path}`);
+    
+    return new Promise((resolve, reject) => {
+      const remotePath = `${this.REMOTE_NAME}:${path}`;
+      const cmd = `rclone lsjson "${remotePath}"`;
+      
+      logger.info('🔧 Executing rclone command:', cmd);
+      
+      exec(cmd, (error, stdout, stderr) => {
+        if (error) {
+          logger.error('❌ rclone command failed:', { error: error.message, stderr });
+          reject(error);
+          return;
+        }
+
+        if (stderr) {
+          logger.warn('⚠️ rclone stderr:', stderr);
+        }
+
+        logger.info('📂 rclone stdout length:', stdout.length);
+
+        try {
+          const files = JSON.parse(stdout || '[]');
+          logger.info('✅ Parsed files count:', files.length);
+          
+          // Transformer les fichiers au format attendu par Twake Drive
+          const transformedFiles = files.map((file: any) => ({
+            id: file.ID || file.Path,
+            name: file.Name,
+            path: file.Path,
+            size: file.Size > 0 ? file.Size : 0,
+            is_directory: file.IsDir || false,
+            mime_type: file.MimeType || (file.IsDir ? 'inode/directory' : 'application/octet-stream'),
+            modified_at: file.ModTime,
+            source: 'dropbox'
+          }));
+          
+          resolve(transformedFiles);
+        } catch (parseError) {
+          logger.error('📁 Failed to parse rclone output:', { parseError, stdout });
+          reject(new Error('Failed to parse file list'));
+        }
+      });
+    });
   }
   
   private registerRoutes(fastify: any): void {
@@ -174,13 +214,16 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
     
     // 3) List files - cette route peut garder le préfixe api car elle est appelée par le backend
     fastify.get(`${apiPrefix}/files/rclone/list`, async (request: any, reply) => {
+      logger.info('📋 List files endpoint called with path:', request.query.path);
       try {
         const path = (request.query.path as string) || '';
+        logger.info('🚀 About to call listFiles with path:', path);
         const files = await this.listFiles(path);
+        logger.info('📤 Sending files response:', files.length, 'files');
         return reply.send(files);
       } catch (error) {
-        logger.error('Listing exception:', error);
-        return reply.status(500).send({ error: 'Internal listing error' });
+        logger.error('❌ Listing exception:', error);
+        return reply.status(500).send({ error: 'Internal listing error', message: error.message });
       }
     });
     

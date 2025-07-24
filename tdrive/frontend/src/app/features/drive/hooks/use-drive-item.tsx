@@ -1,7 +1,7 @@
 import { ToasterService } from '@features/global/services/toaster-service';
 import { LoadingStateInitTrue } from '@features/global/state/atoms/Loading';
 import useRouterCompany from '@features/router/hooks/use-router-company';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useRecoilCallback, useRecoilState, useRecoilValue } from 'recoil';
 import { DriveItemAtom, DriveItemChildrenAtom, DriveItemPagination } from '../state/store';
 import { DriveItem } from '../types';
@@ -21,6 +21,13 @@ export const useDriveItem = (id: string) => {
   const [children, setChildren] = useRecoilState(DriveItemChildrenAtom(id));
   const [loading, setLoading] = useRecoilState(LoadingStateInitTrue('useDriveItem-' + id));
   const [paginateItem, setPaginateItem] = useRecoilState(DriveItemPagination);
+  const isMountedRef = useRef(true);
+  
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
   const {
     refresh: refreshItem,
     create,
@@ -38,7 +45,9 @@ export const useDriveItem = (id: string) => {
         setPaginateItem(prev => ({ ...prev, page: 0 }));
         await refreshItem(parentId, resetPagination);
       } finally {
-        setLoading(false);
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
       }
     },
     [id, setLoading, refreshItem],
@@ -51,7 +60,9 @@ export const useDriveItem = (id: string) => {
     } catch (e) {
       ToasterService.error('Unable to remove this file.');
     }
-    setLoading(false);
+    if (isMountedRef.current) {
+      setLoading(false);
+    }
   }, [id, setLoading, refresh, item?.item?.parent_id]);
 
   const restore = useCallback(async () => {
@@ -61,7 +72,9 @@ export const useDriveItem = (id: string) => {
     } catch (e) {
       ToasterService.error('Unable to restore this item.');
     }
-    setLoading(false);
+    if (isMountedRef.current) {
+      setLoading(false);
+    }
   }, [id, setLoading, refresh, item?.item?.parent_id]);
 
   const update = useCallback(
@@ -72,7 +85,9 @@ export const useDriveItem = (id: string) => {
       } catch (e) {
         ToasterService.error('Unable to update this file.');
       }
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     },
     [id, setLoading, refresh, item?.item?.parent_id],
   );
@@ -85,7 +100,9 @@ export const useDriveItem = (id: string) => {
       } catch (e) {
         ToasterService.error('Unable to update user access.');
       }
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     },
     [id, setLoading, refresh, item?.item?.parent_id],
   );
@@ -98,7 +115,9 @@ export const useDriveItem = (id: string) => {
       } catch (e) {
         ToasterService.error('Unable to create a new version of this file.');
       }
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     },
     [companyId, id, setLoading, refresh, item?.item?.parent_id],
   );

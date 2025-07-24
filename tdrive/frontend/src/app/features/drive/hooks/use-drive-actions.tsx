@@ -19,6 +19,7 @@ import FeatureTogglesService, {
 } from '@features/global/services/feature-toggles-service';
 import Logger from '@features/global/framework/logger-service';
 import jwtStorageService from '@features/auth/jwt-storage-service';
+import { useDropboxFiles } from './use-dropbox-files';
 
 /**
  * Returns the children of a drive item
@@ -31,6 +32,7 @@ export const useDriveActions = (inPublicSharing?: boolean) => {
   const [paginateItem] = useRecoilState(DriveItemPagination);
   const { getQuota } = useUserQuota();
   const AVEnabled = FeatureTogglesService.isActiveFeatureName(FeatureNames.COMPANY_AV_ENABLED);
+  const { refreshDropboxFiles } = useDropboxFiles();
 
   /**
    * Downloads a file from the given URL, ensuring compatibility across all browsers, including Safari.
@@ -120,6 +122,18 @@ export const useDriveActions = (inPublicSharing?: boolean) => {
     ({ set, snapshot }) =>
       async (parentId: string, resetPagination?: boolean) => {
         if (parentId) {
+          // Détecter si c'est un identifiant Dropbox
+          if (parentId.startsWith('dropbox_') || parentId === 'dropbox_root') {
+            let dropboxPath = '';
+            if (parentId === 'dropbox_root') {
+              dropboxPath = '';
+            } else {
+              // Extraire le chemin en supprimant le préfixe 'dropbox_'
+              dropboxPath = parentId.replace('dropbox_', '');
+            }
+            return await refreshDropboxFiles(dropboxPath);
+          }
+          
           const filter: BrowseFilter = {
             company_id: companyId,
             mime_type: sharedFilter.mimeType.value,
@@ -416,6 +430,19 @@ export const useDriveActions = (inPublicSharing?: boolean) => {
   const nextPage = useRecoilCallback(
     ({ snapshot }) =>
       async (parentId: string) => {
+        // Vérifier si c'est un dossier Dropbox
+        if (parentId.startsWith('dropbox_') || parentId === 'dropbox_root') {
+          let dropboxPath: string;
+          if (parentId === 'dropbox_root') {
+            dropboxPath = '';
+          } else {
+            // Extraire le chemin en supprimant le préfixe 'dropbox_'
+            dropboxPath = parentId.replace('dropbox_', '');
+          }
+          return await refreshDropboxFiles(dropboxPath);
+        }
+        
+        // Utiliser l'API standard pour les autres dossiers
         const filter: BrowseFilter = {
           company_id: companyId,
           mime_type: sharedFilter.mimeType.value,
@@ -430,7 +457,7 @@ export const useDriveActions = (inPublicSharing?: boolean) => {
         );
         return details;
       },
-    [paginateItem, refresh],
+    [paginateItem, refresh, refreshDropboxFiles],
   );
 
   const checkMalware = useCallback(

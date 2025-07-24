@@ -27,13 +27,18 @@ export const useWatcher = <G>(
   const isAsync = ['Promise', 'AsyncFunction'].indexOf(value?.constructor?.name || '') < 0;
 
   const [, forceRender] = useState<G>(isAsync ? null : value);
+  const isMountedRef = useRef(true);
 
   const savedObservable = useRef(observable);
-  const savedForceRender = useRef((v: any) => forceRender(v));
+  const savedForceRender = useRef((v: any) => {
+    if (isMountedRef.current) {
+      forceRender(v);
+    }
+  });
 
   useMemo(() => {
-    savedObservable.current.removeWatcher(forceRender);
-    observable.addWatcher(forceRender, observedScope, options);
+    savedObservable.current.removeWatcher(savedForceRender.current);
+    observable.addWatcher(savedForceRender.current, observedScope, options);
     savedObservable.current = observable;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, options?.memoizedFilters || []);
@@ -53,7 +58,7 @@ export const useWatcher = <G>(
     );
 
     savedObservable.current.getChanges<G>(watcher).then(changes => {
-      if (changes.didChange) {
+      if (changes.didChange && isMountedRef.current) {
         forceRender(changes.changes);
       }
     });
@@ -61,6 +66,7 @@ export const useWatcher = <G>(
     return () => {
       // eslint-disable-next-line react-hooks/exhaustive-deps
       savedObservable.current.removeWatcher(savedForceRender.current);
+      isMountedRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
