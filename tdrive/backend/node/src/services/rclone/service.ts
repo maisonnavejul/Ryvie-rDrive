@@ -372,29 +372,6 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
       }
     });
     
-    // 4) Route de test pour recevoir les informations utilisateur
-    fastify.post(`${apiPrefix}/rclone/test-user`, {
-      preValidation: fastify.authenticate
-    }, async (request: any, reply) => {
-      logger.info('🧪 Test User Info endpoint called');
-      
-      // Récupérer le contexte utilisateur depuis l'authentification JWT
-      const userContext = request.user || {};
-      logger.info('🔐 User context from JWT:', userContext);
-      
-      // Récupérer les données envoyées depuis le frontend
-      const requestBody = request.body || {};
-      logger.info('📦 Request body from frontend:', requestBody);
-      
-      // Retourner une réponse avec les informations
-      return reply.send({
-        success: true,
-        message: 'User info received successfully',
-        userContext: userContext,
-        receivedData: requestBody,
-        timestamp: new Date().toISOString()
-      });
-    });
-    
+
   }
 }
