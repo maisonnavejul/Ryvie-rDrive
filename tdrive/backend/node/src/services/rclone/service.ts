@@ -12,10 +12,17 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
   name = "rclone";
   
   // Configuration
-  private REMOTE_NAME = 'test4';
+  private REMOTE_NAME = 'julestest';
+  private currentUserEmail = 'default@user.com'; // Email de l'utilisateur actuel
+  
+  // Génère un nom de remote basé sur l'email
+  private getRemoteName(userEmail: string): string {
+    const sanitized = userEmail.replace(/[@\.]/g, '_').toLowerCase();
+    return `dropbox_${sanitized}`;
+  }
   private PROXY = process.env.OAUTH_PROXY || 'https://cloudoauth.files.ryvie.fr';
-  private DROPBOX_APPKEY = '4b5q5772012fqnf';
-  private DROPBOX_APPSECRET = 'obtjnollfq4j5ck';
+  private DROPBOX_APPKEY = 'fuv2aur5vtmg0r3'; 
+  private DROPBOX_APPSECRET = 'ejsdcf3b51q8hvf';
 
   constructor() {
     super();
@@ -259,6 +266,15 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
     // 1) Generate AuthUrl for Dropbox OAuth
     // Le frontend appelle /v1/drivers/Dropbox (sans le préfixe api)
     fastify.get(`/v1/drivers/Dropbox`, async (request: any, reply) => {
+      // Récupérer l'email utilisateur depuis les query parameters
+      const userEmail = request.query.userEmail as string || 'default@user.com';
+      logger.info('📧 Email utilisateur reçu:', userEmail);
+      
+      // Mettre à jour l'email actuel et le remote name
+      this.currentUserEmail = userEmail;
+      this.REMOTE_NAME = this.getRemoteName(userEmail);
+      logger.info('🔧 Remote name mis à jour:', this.REMOTE_NAME);
+      
       const authUrl = await this.getAuthUrl(request);
       logger.info('→ AuthUrl generated:', authUrl);
       // Important: Format exact attendu par le frontend
@@ -331,10 +347,21 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
     });
     
     // 3) List files - cette route peut garder le préfixe api car elle est appelée par le backend
-    fastify.get(`${apiPrefix}/files/rclone/list`, async (request: any, reply) => {
+    fastify.get(`${apiPrefix}/files/rclone/list`, {
+      preValidation: fastify.authenticate
+    }, async (request: any, reply) => {
       logger.info('📋 List files endpoint called with path:', request.query.path);
       try {
         const path = (request.query.path as string) || '';
+        const userEmail = request.query.userEmail as string || 'default@user.com';
+        
+        logger.info('📧 Email utilisateur pour listing:', userEmail);
+        
+        // Mettre à jour le remote name pour cet utilisateur
+        this.currentUserEmail = userEmail;
+        this.REMOTE_NAME = this.getRemoteName(userEmail);
+        logger.info('🔧 Remote name mis à jour pour listing:', this.REMOTE_NAME);
+        
         logger.info('🚀 About to call listFiles with path:', path);
         const files = await this.listFiles(path);
         logger.info('📤 Sending files response:', files.length, 'files');
@@ -343,6 +370,30 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
         logger.error('❌ Listing exception:', error);
         return reply.status(500).send({ error: 'Internal listing error', message: error.message });
       }
+    });
+    
+    // 4) Route de test pour recevoir les informations utilisateur
+    fastify.post(`${apiPrefix}/rclone/test-user`, {
+      preValidation: fastify.authenticate
+    }, async (request: any, reply) => {
+      logger.info('🧪 Test User Info endpoint called');
+      
+      // Récupérer le contexte utilisateur depuis l'authentification JWT
+      const userContext = request.user || {};
+      logger.info('🔐 User context from JWT:', userContext);
+      
+      // Récupérer les données envoyées depuis le frontend
+      const requestBody = request.body || {};
+      logger.info('📦 Request body from frontend:', requestBody);
+      
+      // Retourner une réponse avec les informations
+      return reply.send({
+        success: true,
+        message: 'User info received successfully',
+        userContext: userContext,
+        receivedData: requestBody,
+        timestamp: new Date().toISOString()
+      });
     });
     
   }
