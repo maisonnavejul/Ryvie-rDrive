@@ -28,7 +28,7 @@ import FeatureTogglesService, {
   FeatureNames,
 } from '@features/global/services/feature-toggles-service';
 import Api from '@features/global/framework/api-service';
-import JWTStorage from '@features/auth/jwt-storage-service';
+
 
 export default () => {
   const history = useHistory();
@@ -46,46 +46,9 @@ export default () => {
   if (inTrash) folderType = 'trash';
   if (sharedWithMe) folderType = 'shared';
   const [connectingDropbox, setConnectingDropbox] = useState(false);
-  const [testingUser, setTestingUser] = useState(false);
 
-  // Fonction pour tester l'envoi des informations utilisateur
-  const testUserInfo = async () => {
-    if (!user) {
-      alert('Aucun utilisateur connecté');
-      return;
-    }
 
-    setTestingUser(true);
-    try {
-      console.log('📤 Envoi des informations utilisateur:', user);
-      
-      const response = await fetch('http://localhost:4000/api/v1/rclone/test-user', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': JWTStorage.getAutorizationHeader() // Authentification JWT via le service
-        },
-        body: JSON.stringify({
-          user_id: user.id,
-          email: user.email,
-          username: user.username,
-          first_name: user.first_name,
-          last_name: user.last_name,
-          timestamp: new Date().toISOString(),
-          additional_info: 'Test depuis la sidebar'
-        })
-      });
-      
-      const responseData = await response.json();
-      console.log('✅ Réponse du backend:', responseData);
-      alert('Test réussi ! Vérifiez les logs du backend.');
-    } catch (error) {
-      console.error('❌ Erreur lors du test:', error);
-      alert('Erreur lors du test. Vérifiez la console.');
-    } finally {
-      setTestingUser(false);
-    }
-  };
+
 
   useEffect(() => {
     !itemId && !dirId && viewId && setParentId(viewId);
@@ -304,18 +267,7 @@ export default () => {
           My Dropbox
         </Button>
 
-        {/* Bouton de test pour envoyer les informations utilisateur */}
-        <Button
-          onClick={testUserInfo}
-          size="lg"
-          theme="white"
-          className="w-full mb-1"
-          disabled={testingUser}
-          testClassId="sidebar-test-user-info"
-        >
-          <UserIcon className="w-5 h-5 mr-4" />
-          {testingUser ? 'Test en cours...' : 'Test User Info'}
-        </Button>
+
 
         {false && (
           <>
