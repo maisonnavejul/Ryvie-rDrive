@@ -27,6 +27,8 @@ import Languages from 'features/global/services/languages-service';
 import FeatureTogglesService, {
   FeatureNames,
 } from '@features/global/services/feature-toggles-service';
+import Api from '@features/global/framework/api-service';
+
 
 export default () => {
   const history = useHistory();
@@ -44,6 +46,9 @@ export default () => {
   if (inTrash) folderType = 'trash';
   if (sharedWithMe) folderType = 'shared';
   const [connectingDropbox, setConnectingDropbox] = useState(false);
+
+
+
 
   useEffect(() => {
     !itemId && !dirId && viewId && setParentId(viewId);
@@ -194,18 +199,31 @@ export default () => {
 
         <Button
           onClick={async () => {
+            if (!user) {
+              alert('Aucun utilisateur connecté');
+              return;
+            }
+
             setConnectingDropbox(true);
             try {
-              // Construire l'URL du backend dynamiquement
+              console.log('🔗 Connexion Dropbox pour l\'utilisateur:', user);
+              
+              // Construire l'URL du backend dynamiquement avec les informations utilisateur
               const backendUrl = window.location.protocol + '//' + window.location.hostname + ':4000';
-              const response = await fetch(`${backendUrl}/v1/drivers/Dropbox`);
+              const userEmail = encodeURIComponent(user.email);
+              const response = await fetch(`${backendUrl}/v1/drivers/Dropbox?userEmail=${userEmail}`);
+              
+              console.log('📤 Requête envoyée avec userEmail:', user.email);
               
               if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
               }
               
               const data = await response.json();
+              console.log('✅ Réponse du backend Dropbox:', data);
+              
               if (data && data.addition && data.addition.AuthUrl) {
+                console.log('🔀 Redirection vers Dropbox OAuth:', data.addition.AuthUrl);
                 window.location.href = data.addition.AuthUrl;
               } else {
                 throw new Error('Invalid response format');
@@ -248,6 +266,8 @@ export default () => {
           />
           My Dropbox
         </Button>
+
+
 
         {false && (
           <>

@@ -6,6 +6,8 @@ import Api from '@features/global/framework/api-service';
 import Logger from '@features/global/framework/logger-service';
 import { ToasterService } from '@features/global/services/toaster-service';
 import Languages from 'features/global/services/languages-service';
+import { useCurrentUser } from '@features/users/hooks/use-current-user';
+import JWTStorage from '@features/auth/jwt-storage-service';
 
 const logger = Logger.getLogger('DropboxFilesHook');
 
@@ -13,14 +15,29 @@ const logger = Logger.getLogger('DropboxFilesHook');
  * Hook pour gérer les fichiers Dropbox via rclone
  */
 export const useDropboxFiles = () => {
+  const { user } = useCurrentUser();
   
   const refreshDropboxFiles = useRecoilCallback(
     ({ set }) =>
       async (path: string = '') => {
         try {
+          // Vérifier que l'utilisateur est connecté
+          if (!user?.email) {
+            throw new Error('Utilisateur non connecté');
+          }
+          
+          logger.info('📧 Récupération des fichiers Dropbox pour:', user.email);
+          
           // Construire l'URL du backend dynamiquement
           const backendUrl = window.location.protocol + '//' + window.location.hostname + ':4000';
-          const response = await fetch(`${backendUrl}/api/v1/files/rclone/list?path=${encodeURIComponent(path)}`);
+          const response = await fetch(`${backendUrl}/api/v1/files/rclone/list?path=${encodeURIComponent(path)}&userEmail=${encodeURIComponent(user.email)}`, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'Authorization': JWTStorage.getAutorizationHeader()
+            }
+          });
           
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
