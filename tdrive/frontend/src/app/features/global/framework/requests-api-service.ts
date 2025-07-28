@@ -40,7 +40,16 @@ class Requests {
           }
         })
         .catch(err => {
-          this.logger.error('Error while sending HTTP request', err);
+          // Filtrer les erreurs 404 temporaires lors de la connexion
+          const isTemporary404 = err?.message?.includes('404') && 
+                                 (route.includes('//browse/') || route.includes('/companies//'));
+          
+          if (!isTemporary404) {
+            this.logger.error('Error while sending HTTP request', err);
+          } else {
+            this.logger.warn('Temporary 404 during authentication, ignoring:', err);
+          }
+          
           callback && callback(JSON.stringify({ errors: [err] }));
         });
       return;

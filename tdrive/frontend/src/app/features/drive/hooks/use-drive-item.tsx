@@ -155,7 +155,23 @@ export const useDriveItem = (id: string) => {
             lastPage: true,
           }));
           console.log('error loading next page: ', e);
-          ToasterService.error('Unable to load more items.');
+          
+          // Filtrer les erreurs temporaires lors de la connexion initiale
+          const errorString = e?.toString?.() || '';
+          const isConnectionError = errorString.includes('404') || errorString.includes('NetworkError');
+          const hasEmptyCompanyId = window.location.href.includes('//browse/') || window.location.href.includes('/companies//');
+          
+          // Délai de grâce de 10 secondes après le chargement de la page
+          const pageLoadTime = window.performance?.timing?.navigationStart || Date.now();
+          const isWithinGracePeriod = (Date.now() - pageLoadTime) < 10000;
+          
+          const isTemporaryError = isConnectionError && (hasEmptyCompanyId || isWithinGracePeriod || !id);
+          
+          if (!isTemporaryError) {
+            ToasterService.error('Unable to load more items.');
+          } else {
+            console.warn('Temporary connection error during authentication, ignoring:', e);
+          }
         } finally {
           set(DriveItemPagination, prev => ({
             ...prev,
