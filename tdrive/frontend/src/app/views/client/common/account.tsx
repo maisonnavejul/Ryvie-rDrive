@@ -4,6 +4,7 @@ import LoginService from '@features/auth/login-service';
 import { useCurrentUser } from '@features/users/hooks/use-current-user';
 import currentUserService from '@features/users/services/current-user-service';
 import AccountParameter from '@views/client/popup/UserParameter/UserParameter';
+import UsersList from '@views/client/popup/UsersList/UsersList';
 import Languages from '../../../features/global/services/languages-service';
 import ModalManagerDepreciated from '@deprecated/popupManager/popupManager';
 import FeatureTogglesService, {
@@ -46,6 +47,15 @@ export default (): JSX.Element => {
           //hide: InitService.server_infos?.configuration?.accounts?.type === 'remote',
           onClick: () => {
             ModalManagerDepreciated.open(<AccountParameter />, true, 'account_parameters');
+          },
+        },
+        {
+          type: 'menu',
+          className: 'account-menu',
+          text: 'Users',
+          icon: <Icon type="user" className="text-black dark:text-white" />,
+          onClick: () => {
+            ModalManagerDepreciated.open(<UsersList />, true, 'users_list');
           },
         },
         {
