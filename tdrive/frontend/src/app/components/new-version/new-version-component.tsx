@@ -16,11 +16,17 @@ const NewVersionComponent = (): JSX.Element => {
   const [displayBanner, setDisplayBanner] = useState<boolean>(false);
 
   const compareVersion: (v1: string, v2: string) => number = (v1: string, v2: string) => {
+    // Toujours retourner -1 pour désactiver les notifications de mise à jour
+    // -1 signifie que la version du serveur (v1) est plus ancienne que la version du client (v2)
+    return -1;
+    
+    /* Version originale commentée
     const toNumber: (v: string) => number = (v: string) => {
       const a = v.split('.').map((s: string) => parseInt(s.replace(/[^0-9]/g, '')));
       return 1000000 * (1000 * a[0] + a[1]) + a[2];
     };
     return toNumber(v1) - toNumber(v2);
+    */
   };
 
   useMemo(() => {
