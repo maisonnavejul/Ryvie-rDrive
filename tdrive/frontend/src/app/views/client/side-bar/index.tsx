@@ -1,5 +1,5 @@
 import { Button } from '@atoms/button/button';
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   ClockIcon,
   CloudIcon,
@@ -41,9 +41,15 @@ export default () => {
   );
   const setNavigationState = useSetRecoilState(DriveNavigationState);
   const [isNavigating, setIsNavigating] = useState(false);
+  const lastNavigationTime = useRef(0);
   
   // Helper pour navigation instantanée optimisée (INP < 200ms)
   const navigateInstantly = useCallback((targetViewId: string, targetParentId: string) => {
+    // Throttling avancé : éviter les clics trop rapprochés (< 100ms)
+    const now = Date.now();
+    if (now - lastNavigationTime.current < 100) return;
+    lastNavigationTime.current = now;
+    
     // Debouncing : éviter les clics multiples
     if (isNavigating) return;
     setIsNavigating(true);
@@ -53,7 +59,7 @@ export default () => {
     
     // 2. Traitement asynchrone pour éviter le blocage
     requestAnimationFrame(() => {
-      // Changement d'état en microtask
+      // Changement d'état en microtask (préchargement)
       setParentId(targetParentId);
       
       // URL update en arrière-plan
@@ -67,9 +73,11 @@ export default () => {
           }),
         );
         
-        // Reset rapide
-        setNavigationState({ isNavigating: false, targetViewId: null });
-        setIsNavigating(false);
+        // Reset rapide avec délai minimal
+        setTimeout(() => {
+          setNavigationState({ isNavigating: false, targetViewId: null });
+          setIsNavigating(false);
+        }, 16); // 1 frame = 16ms
       }, 0);
     });
   }, [company, history, setNavigationState, setParentId, isNavigating]);
@@ -157,15 +165,7 @@ export default () => {
         {FeatureTogglesService.isActiveFeatureName(FeatureNames.COMPANY_MANAGE_ACCESS) && (
           <Button
             onClick={() => {
-              history.push(
-                RouterServices.generateRouteFromState({
-                  companyId: company,
-                  viewId: 'shared_with_me',
-                  itemId: '',
-                  dirId: '',
-                }),
-              );
-              // setParentId('shared_with_me');
+              navigateInstantly('shared_with_me', 'shared_with_me');
             }}
             size="lg"
             theme="white"

@@ -159,10 +159,6 @@ export default memo(
       refresh(parentId);
     }, [parentId, refresh, filter]);
 
-    const uploadItemModal = useCallback(() => {
-      if (item?.id) setUploadModalState({ open: true, parent_id: item.id });
-    }, [item?.id, setUploadModalState]);
-
     const items =
       item?.is_directory === false
         ? //We use this hack for public shared single file
@@ -331,6 +327,30 @@ export default memo(
     }, [paginateItem, loading, parentId, itemsPerPage]);
 
     const [isPreparingUpload, setIsPreparingUpload] = useState(false);
+    
+    // Mémoisation des handlers de boutons pour éviter les re-renders coûteux
+    const uploadItemModal = useCallback(() => {
+      if (item?.id) setUploadModalState({ open: true, parent_id: item.id });
+    }, [item?.id, setUploadModalState]);
+    
+    const handleUploadPrepare = useCallback(() => {
+      setIsPreparingUpload(true);
+    }, []);
+    
+    const handleUploadComplete = useCallback(() => {
+      setIsPreparingUpload(false);
+    }, []);
+    
+
+    
+    // Lazy loading des boutons pour éviter le rendu coûteux
+    const [buttonsVisible, setButtonsVisible] = useState(false);
+    
+    useEffect(() => {
+      // Délai minimal pour afficher les boutons après le rendu principal
+      const timer = setTimeout(() => setButtonsVisible(true), 0);
+      return () => clearTimeout(timer);
+    }, []);
 
     return (
       <>
@@ -351,10 +371,10 @@ export default memo(
             allowPaste={true}
             ref={uploadZoneRef}
             driveCollectionKey={uploadZone}
+            onPrepareUpload={handleUploadPrepare}
+            onFinishUpload={handleUploadComplete}
             onAddFiles={async (_, event) => {
-              setIsPreparingUpload(true);
               const tree = await getFilesTree(event);
-              setIsPreparingUpload(false);
               setCreationModalState({ parent_id: '', open: false });
               await uploadTree(tree, {
                 companyId,
@@ -479,13 +499,14 @@ export default memo(
                   </BaseSmall>
                 )}
 
-                <Menu
-                  menu={() => onBuildSortContextMenu()}
-                  sortData={sortLabel}
-                  testClassId="browser-menu-sorting"
-                >
-                  {' '}
-                  <Button
+                {buttonsVisible && (
+                  <Menu
+                    menu={() => onBuildSortContextMenu()}
+                    sortData={sortLabel}
+                    testClassId="browser-menu-sorting"
+                  >
+                    {' '}
+                    <Button
                     theme="outline"
                     className="ml-4 flex flex-row items-center border-0 md:border !text-gray-500 md:!text-blue-500 px-0 md:px-4"
                     testClassId="button-sorting"
@@ -499,9 +520,10 @@ export default memo(
                       {Languages.t('components.item_context_menu.sorting.selected.' + sortLabel.by)}
                     </span>
                     <ChevronDownIcon className="h-4 w-4 ml-2 -mr-1" />
-                  </Button>
-                </Menu>
-                {viewId !== 'shared_with_me' && (
+                    </Button>
+                  </Menu>
+                )}
+                {viewId !== 'shared_with_me' && buttonsVisible && (
                   <Menu menu={() => onBuildContextMenu(details)} testClassId="browser-menu-more">
                     {' '}
                     <Button
