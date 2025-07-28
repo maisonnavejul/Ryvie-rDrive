@@ -10,7 +10,7 @@ import useRouterCompany from '@features/router/hooks/use-router-company';
 import { useDrivePreview } from '@features/drive/hooks/use-drive-preview';
 import { formatBytes } from '@features/drive/utils';
 import Languages from '@features/global/services/languages-service';
-import { useState } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { PublicIcon } from '../components/public-icon';
 import { CheckableIcon, DriveItemOverlayProps, DriveItemProps } from './common';
 
@@ -24,7 +24,7 @@ import FeatureTogglesService, {
   FeatureNames,
 } from '@features/global/services/feature-toggles-service';
 
-export const DocumentRow = ({
+export const DocumentRow = memo(({
   item,
   className,
   onCheck,
@@ -38,11 +38,10 @@ export const DocumentRow = ({
   const company = useRouterCompany();
   const notSafe = ['malicious', 'skipped', 'scan_failed'].includes(item.av_status);
 
-  const preview = () => {
+  const preview = useCallback(() => {
     open(item);
     history.push(RouterServices.generateRouteFromState({ companyId: company, itemId: item.id }));
-    // history.push(RouterServices.generateRouteFromState({ companyId: company, itemId: item.id }));
-  };
+  }, [open, item, history, company]);
 
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
@@ -57,20 +56,20 @@ export const DocumentRow = ({
         'testid:document-row'
       }
       id={`DR-${item.id}`}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      onClick={e => {
+      onMouseEnter={useCallback(() => setHover(true), [])}
+      onMouseLeave={useCallback(() => setHover(false), [])}
+      onClick={useCallback((e: React.MouseEvent) => {
         if (e.shiftKey || e.ctrlKey) onCheck(!checked);
         else if (onClick) onClick();
         else {
           if (!notSafe) preview();
         }
-      }}
+      }, [onCheck, checked, onClick, notSafe, preview])}
     >
       <div
-        onClick={e => {
+        onClick={useCallback((e: React.MouseEvent) => {
           e.stopPropagation();
-        }}
+        }, [])}
       >
         <CheckableIcon
           className="mr-2 -ml-1"
@@ -116,7 +115,7 @@ export const DocumentRow = ({
       </div>
     </div>
   );
-};
+});
 
 export const DocumentRowOverlay = ({ item, className }: DriveItemOverlayProps) => {
   return (

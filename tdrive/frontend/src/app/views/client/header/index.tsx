@@ -18,12 +18,12 @@ export default ({ openSideMenu }: { openSideMenu: () => void }) => {
         <div className="sm:inline-grid">
           <img
             src="/public/img/logo/logo-text-black.svg"
-            className="h-9 ml-1 dark:hidden block"
+            className="h-14 ml-1 dark:hidden block"
             alt="Tdrive"
           />
           <img
             src="/public/img/logo/logo-text-white.svg"
-            className="h-9 ml-1 dark:block hidden"
+            className="h-14 ml-1 dark:block hidden"
             alt="Tdrive"
           />
         </div>

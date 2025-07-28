@@ -4,13 +4,13 @@ import { Button } from '@atoms/button/button';
 import { Base, BaseSmall } from '@atoms/text';
 import Menu from '@components/menus/menu';
 import { formatBytes } from '@features/drive/utils';
-import { useState } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { PublicIcon } from '../components/public-icon';
 import { CheckableIcon, DriveItemProps } from './common';
 import { hasAnyPublicLinkAccess } from '@features/files/utils/access-info-helpers';
 import './style.scss';
 
-export const FolderRow = ({
+export const FolderRow = memo(({
   item,
   className,
   onCheck,
@@ -33,14 +33,14 @@ export const FolderRow = ({
         (className || '') + ' ' +
         'testid:folder-row'
       }
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      onClick={e => {
+      onMouseEnter={useCallback(() => setHover(true), [])}
+      onMouseLeave={useCallback(() => setHover(false), [])}
+      onClick={useCallback((e: React.MouseEvent) => {
         if (e.shiftKey || e.ctrlKey) onCheck(!checked);
         else if (onClick) onClick();
-      }}
+      }, [onCheck, checked, onClick])}
     >
-      <div onClick={e => e.stopPropagation()}>
+      <div onClick={useCallback((e: React.MouseEvent) => e.stopPropagation(), [])}>
         <CheckableIcon
           className="mr-2 -ml-1"
           show={hover || checked}
@@ -73,4 +73,4 @@ export const FolderRow = ({
       </div>
     </div>
   );
-};
+});

@@ -32,3 +32,15 @@ export const DriveItemPagination = atom<BrowsePaginate>({
     lastPage: false,
   },
 });
+
+// État pour la navigation instantanée
+export const DriveNavigationState = atom<{
+  isNavigating: boolean;
+  targetViewId: string | null;
+}>({
+  key: 'DriveNavigationState',
+  default: {
+    isNavigating: false,
+    targetViewId: null,
+  },
+});

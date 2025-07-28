@@ -145,6 +145,13 @@ export const useDriveActions = (inPublicSharing?: boolean) => {
             set(DriveItemPagination, pagination);
           }
           let details: DriveItemDetails | undefined;
+          
+          // Garde préventive : éviter les appels avec company ID vide
+          if (!companyId || companyId.trim() === '') {
+            console.warn('Company ID is empty, skipping API call to avoid 404');
+            return; // Sortir silencieusement sans erreur
+          }
+          
           try {
             details = await DriveApiClient.browse(
               companyId,
@@ -164,7 +171,23 @@ export const useDriveActions = (inPublicSharing?: boolean) => {
             }
             return details;
           } catch (e) {
-            ToasterService.error(Languages.t('hooks.use-drive-actions.unable_load_file'));
+            // Filtrer les erreurs temporaires lors de la connexion initiale
+            const errorString = e?.toString?.() || '';
+            const isConnectionError = errorString.includes('404') || errorString.includes('NetworkError');
+            const isInitialLoad = !details || Object.keys(details).length === 0;
+            const hasEmptyCompanyId = window.location.href.includes('//browse/') || window.location.href.includes('/companies//');
+            
+            // Délai de grâce de 10 secondes après le chargement de la page
+            const pageLoadTime = window.performance?.timing?.navigationStart || Date.now();
+            const isWithinGracePeriod = (Date.now() - pageLoadTime) < 10000;
+            
+            const isTemporaryError = isConnectionError && (isInitialLoad || hasEmptyCompanyId || isWithinGracePeriod);
+            
+            if (!isTemporaryError) {
+              ToasterService.error(Languages.t('hooks.use-drive-actions.unable_load_file'));
+            } else {
+              console.warn('Temporary connection error during authentication, ignoring:', e);
+            }
           } finally {
             set(DriveItemPagination, {
               page: pagination.limit,

@@ -1,6 +1,6 @@
 {
   "name": "@tdrive/tdrive-backend",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "Tdrive backend",
   "scripts": {
     "build": "npm run build:clean && npm run build:ts && npm run build:copy-assets",
