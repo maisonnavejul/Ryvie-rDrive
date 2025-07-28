@@ -29,7 +29,7 @@ services:
       - PUBSUB_TYPE=local
       - SEARCH_DRIVER=mongodb
       - STORAGE_DRIVER=local
-      - STORAGE_LOCAL_PATH=/tmp/td  
+      - STORAGE_LOCAL_PATH=/tdrive
       - ENABLE_FEATURE_ANTIVIRUS=false
       - DIAG_PROBE_SECRET=diag-secret
     
@@ -37,6 +37,8 @@ services:
     volumes: &backend_volumes
       - ./backend/node/profiles:/usr/src/app/profiles
       - ./backend/node/src:/usr/src/app/src
+      # Volume persistant pour le stockage des fichiers
+      - ./docker-data/files:/tdrive
       # Montage de rclone depuis l'hôte
       - /usr/bin/rclone:/usr/bin/rclone:ro
       # Montage pour que sudo rclone fonctionne sur l'hôte (utilise la config de root)
