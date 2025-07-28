@@ -7,12 +7,12 @@ import UploadZone from '@components/uploads/upload-zone';
 import { setTdriveTabToken } from '@features/drive/api-client/api-client';
 import { useDriveItem } from '@features/drive/hooks/use-drive-item';
 import { useDriveUpload } from '@features/drive/hooks/use-drive-upload';
-import { DriveItemSelectedList, DriveItemSort } from '@features/drive/state/store';
+import { DriveItemSelectedList, DriveItemSort, DriveNavigationState } from '@features/drive/state/store';
 import { formatBytes } from '@features/drive/utils';
 import useRouterCompany from '@features/router/hooks/use-router-company';
 import _ from 'lodash';
-import { memo, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { atomFamily, useRecoilState, useSetRecoilState } from 'recoil';
+import { memo, Suspense, useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { atomFamily, useRecoilState, useSetRecoilState, useRecoilValue } from 'recoil';
 import { DrivePreview } from '../../viewer/drive-preview';
 import {
   useOnBuildContextMenu,
@@ -96,6 +96,8 @@ export default memo(
     }, [viewId, dirId]);
 
     const [loadingParentChange, setLoadingParentChange] = useState(false);
+    const navigationState = useRecoilValue(DriveNavigationState);
+    
     const {
       sharedWithMe,
       details,
@@ -112,7 +114,23 @@ export default memo(
     const { uploadTree } = useDriveUpload();
     const { uploadTree: _uploadTree } = useUploadExp();
 
+    // Chargement optimisé : navigation instantanée + chargement des données
     const loading = loadingParent || loadingParentChange;
+    const isNavigatingInstantly = navigationState.isNavigating;
+    
+    // Mémoisation des items pour éviter les re-calculs coûteux
+    const memoizedItems = useMemo(() => children || [], [children]);
+    const itemsCount = memoizedItems.length;
+    
+    // Virtualisation légère pour les grandes listes (> 50 items)
+    const shouldVirtualize = itemsCount > 50;
+    const [visibleRange, setVisibleRange] = useState({ start: 0, end: shouldVirtualize ? 50 : itemsCount });
+    
+    const visibleItems = useMemo(() => {
+      return shouldVirtualize 
+        ? memoizedItems.slice(visibleRange.start, visibleRange.end)
+        : memoizedItems;
+    }, [memoizedItems, visibleRange, shouldVirtualize]);
 
     const uploadZone = 'drive_' + companyId;
     const uploadZoneRef = useRef<UploadZone | null>(null);
@@ -283,23 +301,24 @@ export default memo(
     }, [loading, children]);
 
     // Determine the number of items that can fit within the scroll viewer's visible area before the scrollbar appears.
-    const getItemsPerPage = () => {
+    const getItemsPerPage = useCallback(() => {
       const scrollViewerElement = scrollViewer?.current || null;
       const itemHeight = scrollViewerElement?.firstElementChild?.clientHeight || 0;
       const viewerHeight = scrollViewerElement?.clientHeight || 0;
       return itemHeight > 0 ? Math.ceil(viewerHeight / itemHeight) : 0;
-    };
+    }, []);
 
     const [itemsPerPage, setItemsPerPage] = useState(0);
 
+    const handleResize = useCallback(() => {
+      setItemsPerPage(getItemsPerPage());
+    }, [getItemsPerPage]);
+
     useEffect(() => {
-      const handleResize = () => {
-        setItemsPerPage(getItemsPerPage());
-      };
       handleResize(); // intially set the items per page for the current view
       window.addEventListener('resize', handleResize);
       return () => window.removeEventListener('resize', handleResize);
-    }, [getItemsPerPage]);
+    }, [handleResize]);
 
     // Load additional pages as needed to ensure the scrollbar remains visible
     useEffect(() => {
@@ -504,7 +523,14 @@ export default memo(
 
               <DndContext sensors={sensors} onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
                 <div className="grow overflow-auto" ref={scrollViewer}>
-                  {items.length === 0 && !loading && (
+                  {/* Indicateur de navigation instantanée */}
+                  {isNavigatingInstantly && (
+                    <div className="flex items-center justify-center py-4 text-blue-500">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                      <span className="text-sm">Navigation...</span>
+                    </div>
+                  )}
+                  {itemsCount === 0 && !loading && (
                     <div className="mt-4 text-center border-2 border-dashed rounded-md p-8">
                       <Subtitle className="block mb-2">
                         {Languages.t('scenes.app.drive.nothing')}
@@ -527,14 +553,14 @@ export default memo(
                       )}
                     </div>
                   )}
-                  {items.map((child, index) =>
+                  {visibleItems.map((child, index) =>
                     child.is_directory ? (
                       <Droppable id={index} key={index}>
                         <FolderRow
                           key={index}
                           className={
                             (index === 0 ? 'rounded-t-md ' : '-mt-px ') +
-                            (index === items.length - 1 ? 'rounded-b-md ' : '') +
+                            (index === visibleItems.length - 1 ? 'rounded-b-md ' : '') +
                             'border-0 md:border'
                           }
                           item={child}

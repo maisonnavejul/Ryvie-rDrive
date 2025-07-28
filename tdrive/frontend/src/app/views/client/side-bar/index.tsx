@@ -10,13 +10,14 @@ import {
   UserIcon,
   UserGroupIcon,
 } from '@heroicons/react/outline';
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import useRouterCompany from '@features/router/hooks/use-router-company';
 import { useCurrentUser } from 'app/features/users/hooks/use-current-user';
-import { useRecoilState } from 'recoil';
+import { useRecoilState, useSetRecoilState } from 'recoil';
 import { Title } from '../../../atoms/text';
 import { useDriveItem } from '../../../features/drive/hooks/use-drive-item';
 import { DriveCurrentFolderAtom } from '../body/drive/browser';
+import { DriveNavigationState } from '../../../features/drive/state/store';
 import Account from '../common/account';
 import AppGrid from '../common/app-grid';
 import DiskUsage from '../common/disk-usage';
@@ -38,6 +39,41 @@ export default () => {
   const [parentId, setParentId] = useRecoilState(
     DriveCurrentFolderAtom({ initialFolderId: viewId || 'user_' + user?.id }),
   );
+  const setNavigationState = useSetRecoilState(DriveNavigationState);
+  const [isNavigating, setIsNavigating] = useState(false);
+  
+  // Helper pour navigation instantanée optimisée (INP < 200ms)
+  const navigateInstantly = useCallback((targetViewId: string, targetParentId: string) => {
+    // Debouncing : éviter les clics multiples
+    if (isNavigating) return;
+    setIsNavigating(true);
+    
+    // 1. Feedback visuel IMMÉDIAT (0ms)
+    setNavigationState({ isNavigating: true, targetViewId });
+    
+    // 2. Traitement asynchrone pour éviter le blocage
+    requestAnimationFrame(() => {
+      // Changement d'état en microtask
+      setParentId(targetParentId);
+      
+      // URL update en arrière-plan
+      setTimeout(() => {
+        history.push(
+          RouterServices.generateRouteFromState({
+            companyId: company,
+            viewId: targetViewId,
+            itemId: '',
+            dirId: '',
+          }),
+        );
+        
+        // Reset rapide
+        setNavigationState({ isNavigating: false, targetViewId: null });
+        setIsNavigating(false);
+      }, 0);
+    });
+  }, [company, history, setNavigationState, setParentId, isNavigating]);
+  
   const active = false;
   const { sharedWithMe, inTrash, path } = useDriveItem(parentId);
   const activeClass = 'bg-zinc-50 dark:bg-zinc-900 !text-blue-500';
@@ -89,15 +125,7 @@ export default () => {
         <Title>Drive</Title>
         <Button
           onClick={() => {
-            history.push(
-              RouterServices.generateRouteFromState({
-                companyId: company,
-                viewId: 'user_' + user?.id,
-                itemId: '',
-                dirId: '',
-              }),
-            );
-            // setParentId('user_' + user?.id);
+            navigateInstantly('user_' + user?.id, 'user_' + user?.id);
           }}
           size="lg"
           theme="white"
@@ -114,15 +142,7 @@ export default () => {
         {FeatureTogglesService.isActiveFeatureName(FeatureNames.COMPANY_SHARED_DRIVE) && (
           <Button
             onClick={() => {
-              setParentId('root');
-              history.push(
-                RouterServices.generateRouteFromState({
-                  companyId: company,
-                  viewId: 'root',
-                  itemId: '',
-                  dirId: '',
-                }),
-              );
+              navigateInstantly('root', 'root');
             }}
             size="lg"
             theme="white"
@@ -178,16 +198,9 @@ export default () => {
           </>
         )}
         <Button
-          onClick={() =>
-            history.push(
-              RouterServices.generateRouteFromState({
-                companyId: company,
-                viewId: 'trash',
-                dirId: undefined,
-                itemId: undefined,
-              }),
-            )
-          }
+          onClick={() => {
+            navigateInstantly('trash', 'trash');
+          }}
           size="lg"
           theme="white"
           className={'w-full mb-1 ' + (folderType === 'trash' ? activeClass : '')}
