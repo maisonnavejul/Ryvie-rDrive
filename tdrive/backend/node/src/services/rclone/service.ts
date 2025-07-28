@@ -372,6 +372,89 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
       }
     });
     
+    // 4) Download file - endpoint pour télécharger un fichier Dropbox
+    fastify.get(`${apiPrefix}/files/rclone/download`, {
+      preValidation: fastify.authenticate
+    }, async (request: any, reply) => {
+      logger.info('📥 Download file endpoint called');
+      logger.info('📥 Request query:', JSON.stringify(request.query));
+      logger.info('📥 Request params:', JSON.stringify(request.params));
+      try {
+        const path = (request.query.path as string) || '';
+        const userEmail = request.query.userEmail as string || 'default@user.com';
+        
+        logger.info('📥 Paramètres extraits - path: "' + path + '", userEmail: "' + userEmail + '"');
+        
+        if (!path) {
+          return reply.status(400).send({ error: 'Path parameter is required' });
+        }
+        
+        // Mettre à jour le remote name pour cet utilisateur
+        this.currentUserEmail = userEmail;
+        this.REMOTE_NAME = this.getRemoteName(userEmail);
+        logger.info('🔧 Remote name calculé: "' + this.REMOTE_NAME + '"');
+        
+        const remotePath = `${this.REMOTE_NAME}:${path}`;
+        logger.info('📂 Chemin remote complet: "' + remotePath + '"');
+        
+        // Utiliser rclone cat pour obtenir le contenu du fichier
+        const cmd = `rclone cat "${remotePath}"`;
+        logger.info('🔧 Commande rclone à exécuter: "' + cmd + '"');
+        
+        const { exec } = require('child_process');
+        
+        return new Promise((resolve, reject) => {
+          const child = exec(cmd, { encoding: 'buffer', maxBuffer: 100 * 1024 * 1024 }, (error, stdout, stderr) => {
+            if (error) {
+              logger.error('❌ rclone download command failed:');
+              logger.error('❌ Error message: "' + error.message + '"');
+              logger.error('❌ Error code: "' + error.code + '"');
+              logger.error('❌ Stderrrrrrrrrrrrrrrrrrrr: "' + (stderr?.toString() || 'N/A') + '"');
+              logger.error('❌ Command was: "' + cmd + '"');
+              reply.status(500).send({ error: 'Download failed', message: error.message, stderr: stderr?.toString() });
+              return reject(error);
+            }
+            
+            if (stderr) {
+              logger.warn('⚠️ rclone download stderr:', stderr);
+            }
+            
+            logger.info('📤 File downloaded successfully, size:', stdout.length, 'bytes');
+            
+            // Déterminer le type MIME basé sur l'extension
+            const fileName = path.split('/').pop() || 'file';
+            const extension = fileName.split('.').pop()?.toLowerCase();
+            let contentType = 'application/octet-stream';
+            
+            switch (extension) {
+              case 'png': contentType = 'image/png'; break;
+              case 'jpg': case 'jpeg': contentType = 'image/jpeg'; break;
+              case 'gif': contentType = 'image/gif'; break;
+              case 'pdf': contentType = 'application/pdf'; break;
+              case 'txt': contentType = 'text/plain'; break;
+              case 'doc': contentType = 'application/msword'; break;
+              case 'docx': contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'; break;
+              case 'mp4': contentType = 'video/mp4'; break;
+              case 'mp3': contentType = 'audio/mpeg'; break;
+              default: contentType = 'application/octet-stream';
+            }
+            
+            logger.info('📤 Content-Type détecté:', contentType, 'pour le fichier:', fileName);
+            
+            // Définir les en-têtes appropriés
+            reply.header('Content-Type', contentType);
+            reply.header('Content-Disposition', `attachment; filename="${fileName}"`);
+            
+            reply.send(stdout);
+            resolve(stdout);
+          });
+        });
+        
+      } catch (error) {
+        logger.error('❌ Download exception:', error);
+        return reply.status(500).send({ error: 'Internal download error', message: error.message });
+      }
+    });
 
   }
 }
