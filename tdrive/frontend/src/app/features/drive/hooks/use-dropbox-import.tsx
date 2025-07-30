@@ -160,7 +160,106 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
   }, [backendUrl, authHeader, company, user?.email]);
 
   /**
-   * Importe **tous** les fichiers (flatten) d’un dossier Dropbox
+   * Crée tous les dossiers nécessaires en une seule passe
+   */
+  const createAllRequiredFolders = useCallback(async (
+    files: Array<{ path: string; name: string }>,
+    folderMap: Map<string, string>,
+    targetFolderId: string
+  ) => {
+    // Extraire tous les chemins de dossiers uniques
+    const folderPaths = new Set<string>();
+    files.forEach(({ path }) => {
+      const segments = path.split('/');
+      for (let i = 0; i < segments.length - 1; i++) {
+        const folderPath = segments.slice(0, i + 1).join('/');
+        folderPaths.add(folderPath);
+      }
+    });
+
+    // Trier par profondeur pour créer les dossiers parents en premier
+    const sortedPaths = Array.from(folderPaths).sort((a, b) => {
+      return a.split('/').length - b.split('/').length;
+    });
+
+    // Créer les dossiers séquentiellement
+    for (const folderPath of sortedPaths) {
+      if (!folderMap.has(folderPath)) {
+        const segments = folderPath.split('/');
+        const parentPath = segments.slice(0, -1).join('/');
+        const folderName = segments[segments.length - 1];
+        const parentId = folderMap.get(parentPath) || targetFolderId;
+
+        try {
+          const folderItem = await DriveApiClient.create(company, {
+            item: {
+              company_id: company,
+              workspace_id: 'drive',
+              parent_id: parentId,
+              name: folderName,
+              is_directory: true
+            }
+          });
+          folderMap.set(folderPath, folderItem.id);
+          logger.debug(`📁 Created folder: ${folderPath}`);
+        } catch (error) {
+          logger.error(`❌ Failed to create folder ${folderPath}:`, error);
+          throw error;
+        }
+      }
+    }
+  }, [company]);
+
+  /**
+   * Obtient l'ID du dossier parent pour un fichier donné
+   */
+  const getParentIdForFile = useCallback((
+    filePath: string,
+    folderMap: Map<string, string>,
+    targetFolderId: string
+  ): string => {
+    const segments = filePath.split('/');
+    if (segments.length === 1) {
+      return targetFolderId; // Fichier à la racine
+    }
+    const parentPath = segments.slice(0, -1).join('/');
+    return folderMap.get(parentPath) || targetFolderId;
+  }, []);
+
+  /**
+   * Importe un fichier avec retry automatique en cas d'échec
+   */
+  const importDropboxFileWithRetry = useCallback(async (
+    dropboxPath: string,
+    fileName: string,
+    targetFolderId: string,
+    maxRetries: number = 2
+  ): Promise<void> => {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+      try {
+        await importDropboxFile(dropboxPath, fileName, targetFolderId);
+        return; // Succès
+      } catch (error) {
+        lastError = error as Error;
+        logger.warn(`⚠️ Attempt ${attempt}/${maxRetries + 1} failed for ${fileName}:`, error);
+        
+        if (attempt <= maxRetries) {
+          // Attendre avant de réessayer (backoff exponentiel)
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    // Si on arrive ici, tous les essais ont échoué
+    throw lastError || new Error(`Failed to import ${fileName} after ${maxRetries + 1} attempts`);
+  }, [importDropboxFile]);
+
+  /**
+   * Importe **tous** les fichiers (flatten) d'un dossier Dropbox - VERSION OPTIMISÉE
+   * Avec parallélisation contrôlée et gestion d'erreurs améliorée
    */
   const importDropboxFolder = useCallback(async (
     dropboxPath: string = '',
@@ -168,80 +267,105 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
   ) => {
     const targetFolderId = options.targetFolderId || `user_${user!.id}`;
     setImporting(true);
+    
+    const startTime = Date.now();
   
     try {
-      // 1) récupérer récursivement tous les fichiers
+      // 1) Récupérer récursivement tous les fichiers
       const files = await getAllDropboxFiles(dropboxPath);
   
-      // 2) log de la liste complète
-      console.log('📥 Tous les fichiers à importer :', files.map(f => f.name));
+      logger.info(`📥 Found ${files.length} files to import`);
       if (files.length === 0) {
         ToasterService.info('Aucun fichier à importer');
         return;
       }
   
-      // 3) prépare un cache des dossiers déjà créés
-      const folderMap = new Map<string,string>();
-      // la racine ("") correspond à targetFolderId
+      // 2) Préparer le cache des dossiers et créer tous les dossiers nécessaires en premier
+      const folderMap = new Map<string, string>();
       folderMap.set('', targetFolderId);
-  
+      
+      await createAllRequiredFolders(files, folderMap, targetFolderId);
+      
+      // 3) Traitement parallélisé des fichiers par lots
+      const batchSize = 8; // Taille optimale pour éviter la surcharge
       let importedCount = 0;
-  
-      // 4) pour chaque fichier, on s’assure que son chemin de dossiers existe
-      for (const { path, name } of files) {
-        // découpe « sous1/sous2/fichier.ext » → ['sous1','sous2','fichier.ext']
-        const segments = path.split('/');
-        let parentId = targetFolderId;
-        let cumulativePath = '';
-  
-        // on ne prend que les segments de dossiers, sauf le dernier (le fichier)
-        for (let i = 0; i < segments.length - 1; i++) {
-          const seg = segments[i];
-          cumulativePath = cumulativePath
-            ? `${cumulativePath}/${seg}`
-            : seg;
-  
-          // si ce dossier n’est pas encore créé
-          if (!folderMap.has(cumulativePath)) {
-            // créer le dossier
-            const folderItem = await DriveApiClient.create(company, {
-              item: {
-                company_id: company,
-                workspace_id: 'drive',
-                parent_id: parentId,
-                name: seg,
-                is_directory: true
-              }
-            });
-            // mémoriser son id
-            folderMap.set(cumulativePath, folderItem.id);
+      let errorCount = 0;
+      const errors: Array<{file: string, error: string}> = [];
+      
+      for (let i = 0; i < files.length; i += batchSize) {
+        const batch = files.slice(i, i + batchSize);
+        const batchNumber = Math.floor(i / batchSize) + 1;
+        const totalBatches = Math.ceil(files.length / batchSize);
+        
+        logger.info(`🔄 Processing batch ${batchNumber}/${totalBatches} (${batch.length} files)`);
+        
+        // Mise à jour du progrès pour le lot
+        setImportProgress({ 
+          current: importedCount, 
+          total: files.length, 
+          currentFile: `Lot ${batchNumber}/${totalBatches} (${batch.length} fichiers)` 
+        });
+        
+        // Traitement parallèle du lot avec gestion d'erreurs
+        const batchResults = await Promise.allSettled(
+          batch.map(async ({ path, name }) => {
+            const parentId = getParentIdForFile(path, folderMap, targetFolderId);
+            return await importDropboxFileWithRetry(path, name, parentId);
+          })
+        );
+        
+        // Compter les résultats du lot
+        batchResults.forEach((result, index) => {
+          const fileName = batch[index].name;
+          if (result.status === 'fulfilled') {
+            importedCount++;
+            logger.debug(`✅ ${fileName} imported successfully`);
+          } else {
+            errorCount++;
+            const errorMsg = result.reason?.message || 'Erreur inconnue';
+            errors.push({ file: fileName, error: errorMsg });
+            logger.error(`❌ Failed to import ${fileName}:`, result.reason);
           }
-          parentId = folderMap.get(cumulativePath)!;
-        }
-  
-        // 5) importer le fichier dans parentId
-        setImportProgress({ current: importedCount, total: files.length, currentFile: name });
-        try {
-          await importDropboxFile(path, name, parentId);
-          importedCount++;
-        } catch (e) {
-          logger.error(`Erreur import ${name}:`, e);
-          ToasterService.error(`Échec import ${name}: ${(e as Error).message}`);
+        });
+        
+        // Progression mise à jour
+        const progress = Math.min(100, Math.round((importedCount + errorCount) / files.length * 100));
+        logger.info(`📊 Progress: ${progress}% (${importedCount + errorCount}/${files.length})`);
+        
+        // Petite pause entre les lots pour éviter la surcharge
+        if (i + batchSize < files.length) {
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
       }
-  
-      // 6) feedback final
-      ToasterService.success(`${importedCount}/${files.length} fichier(s) importé(s)`);
+      
+      // 4) Feedback final avec statistiques détaillées
+      const duration = Math.round((Date.now() - startTime) / 1000);
+      const successRate = Math.round((importedCount / files.length) * 100);
+      
+      if (errorCount === 0) {
+        ToasterService.success(`🎉 ${importedCount} fichiers importés avec succès en ${duration}s (${successRate}%)`);
+      } else {
+        ToasterService.warning(`⚠️ ${importedCount}/${files.length} fichiers importés (${errorCount} erreurs)`);
+        
+        // Afficher les premières erreurs pour debug
+        if (errors.length > 0) {
+          const firstErrors = errors.slice(0, 3).map(e => `${e.file}: ${e.error}`).join('\n');
+          logger.error('Premières erreurs d\'import:', firstErrors);
+        }
+      }
+      
       await refresh(targetFolderId);
+      
+      logger.info(`🏁 Sync completed: ${importedCount} success, ${errorCount} errors, ${duration}s total`);
   
     } catch (err) {
-      logger.error('Erreur import dossier:', err);
-      ToasterService.error(`Erreur import: ${(err as Error).message}`);
+      logger.error('Erreur critique import dossier:', err);
+      ToasterService.error(`Erreur critique: ${(err as Error).message}`);
     } finally {
       setImportProgress(null);
       setImporting(false);
     }
-  }, [getAllDropboxFiles, importDropboxFile, refresh, user?.id]);
+  }, [getAllDropboxFiles, createAllRequiredFolders, getParentIdForFile, importDropboxFileWithRetry, refresh, user?.id]);
   
 
   return {
