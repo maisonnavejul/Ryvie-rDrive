@@ -12,7 +12,7 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
   name = "rclone";
   
   // Configuration
-  private REMOTE_NAME = 'julestest';
+  private REMOTE_NAME = '';
   private currentUserEmail = 'default@user.com'; // Email de l'utilisateur actuel
   
   // Génère un nom de remote basé sur l'email
@@ -350,7 +350,7 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
     fastify.get(`${apiPrefix}/files/rclone/list`, {
       preValidation: fastify.authenticate
     }, async (request: any, reply) => {
-      logger.info('📋 List files endpoint called with path:', request.query.path);
+      //logger.info('📋 List files endpoint called with path:', request.query.path);
       try {
         const path = (request.query.path as string) || '';
         const userEmail = request.query.userEmail as string || 'default@user.com';
@@ -360,14 +360,14 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
         // Mettre à jour le remote name pour cet utilisateur
         this.currentUserEmail = userEmail;
         this.REMOTE_NAME = this.getRemoteName(userEmail);
-        logger.info('🔧 Remote name mis à jour pour listing:', this.REMOTE_NAME);
+       // logger.info('🔧 Remote name mis à jour pour listing:', this.REMOTE_NAME);
         
-        logger.info('🚀 About to call listFiles with path:', path);
+       // logger.info('🚀 About to call listFiles with path:', path);
         const files = await this.listFiles(path);
-        logger.info('📤 Sending files response:', files.length, 'files');
+       // logger.info('📤 Sending files response:', files.length, 'files');
         return reply.send(files);
       } catch (error) {
-        logger.error('❌ Listing exception:', error);
+       // logger.error('❌ Listing exception:', error);
         return reply.status(500).send({ error: 'Internal listing error', message: error.message });
       }
     });
@@ -455,6 +455,7 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
         return reply.status(500).send({ error: 'Internal download error', message: error.message });
       }
     });
+    
 
   }
 }

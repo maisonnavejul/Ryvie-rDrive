@@ -1,11 +1,9 @@
 import { useCallback, useState } from 'react';
-import { useRecoilCallback } from 'recoil';
 import { DriveApiClient } from '../api-client/api-client';
 import { useDriveActions } from './use-drive-actions';
 import { useCurrentUser } from 'app/features/users/hooks/use-current-user';
 import useRouterCompany from '@features/router/hooks/use-router-company';
 import { ToasterService } from '@features/global/services/toaster-service';
-import Languages from 'features/global/services/languages-service';
 import Logger from '@features/global/framework/logger-service';
 import FileUploadService from '@features/files/services/file-upload-service';
 import JWTStorage from '@features/auth/jwt-storage-service';
@@ -31,81 +29,82 @@ export const useDropboxImport = () => {
     currentFile: string;
   } | null>(null);
 
+  const backendUrl = `${window.location.protocol}//${window.location.hostname}:4000`;
+  const authHeader = JWTStorage.getAutorizationHeader();
+
   /**
-   * Récupérer la liste des fichiers Dropbox
+   * Récupérer la liste des items (fichiers + dossiers) depuis Dropbox
    */
   const getDropboxFiles = useCallback(async (path: string = ''): Promise<any[]> => {
-    if (!user?.email) {
-      throw new Error('Utilisateur non connecté');
-    }
-
-    const backendUrl = window.location.protocol + '//' + window.location.hostname + ':4000';
-    const response = await fetch(
+    if (!user?.email) throw new Error('Utilisateur non connecté');
+    const res = await fetch(
       `${backendUrl}/api/v1/files/rclone/list?path=${encodeURIComponent(path)}&userEmail=${encodeURIComponent(user.email)}`,
       {
         method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': JWTStorage.getAutorizationHeader()
-        },
+        headers: { 'Authorization': authHeader }
       }
     );
-
-    if (!response.ok) {
-      throw new Error(`Erreur lors de la récupération des fichiers Dropbox: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    if (!Array.isArray(data)) {
-      throw new Error('Format de réponse invalide de l\'API rclone');
-    }
-
-    logger.info('Fichiers Dropbox récupérés:', data);
+    if (!res.ok) throw new Error(`Erreur liste Dropbox: ${res.statusText}`);
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error('Réponse API invalide');
     return data;
   }, [user?.email]);
 
   /**
-   * Importer un fichier Dropbox vers le disque local
+   * Récupérer **tous** les fichiers (pas les dossiers) sous un path, récursivement
+   */
+  const getAllDropboxFiles = useCallback(async (rootPath: string = ''): Promise<Array<{ path: string; name: string }>> => {
+    const stack = [rootPath];
+    const allFiles: Array<{ path: string; name: string }> = [];
+
+    while (stack.length) {
+      const current = stack.pop()!;
+      const items = await getDropboxFiles(current);
+
+      for (const item of items) {
+        // génère le chemin complet : soit "dossier/fichier", soit juste "fichier" en racine
+        const fullPath = current ? `${current}/${item.path}` : item.path;
+        if (item.is_directory) {
+          stack.push(fullPath);
+        } else {
+          allFiles.push({ path: fullPath, name: item.name });
+        }
+      }
+      
+    }
+
+    return allFiles;
+  }, [getDropboxFiles]);
+
+  /**
+   * Importe un seul fichier depuis Dropbox vers le disque local
    */
   const importDropboxFile = useCallback(async (
     dropboxPath: string,
     fileName: string,
-    targetFolderId: string = 'user_' + user?.id
+    targetFolderId: string
   ): Promise<void> => {
-    if (!user?.email) {
-      throw new Error('Utilisateur non connecté');
-    }
+    logger.info('Import du fichier Dropbox:', dropboxPath);
 
-    logger.info('Import du fichier Dropbox:', { dropboxPath, fileName, targetFolderId });
+    // 1. Télécharger depuis Dropbox
+    const safePath = dropboxPath
+  .split('/')
+  .map(segment => encodeURIComponent(segment))
+  .join('/');
+const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}&userEmail=${encodeURIComponent(user!.email)}`;
 
-    const backendUrl = window.location.protocol + '//' + window.location.hostname + ':4000';
-    const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${encodeURIComponent(dropboxPath)}&userEmail=${encodeURIComponent(user.email)}`;
-    
-    logger.info('URL de téléchargement:', downloadUrl);
-    
-    // Étape 1: Télécharger le fichier depuis Dropbox
-    const downloadResponse = await fetch(
-      downloadUrl,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': JWTStorage.getAutorizationHeader()
-        },
-      }
-    );
+    const resp = await fetch(downloadUrl, {
+      method: 'GET',
+      headers: { 'Authorization': authHeader }
+    });
+    if (!resp.ok) throw new Error(`Téléchargement failed: ${resp.statusText}`);
+    const blob = await resp.blob();
 
-    if (!downloadResponse.ok) {
-      throw new Error(`Erreur lors du téléchargement: ${downloadResponse.statusText}`);
-    }
-
-    const fileBlob = await downloadResponse.blob();
-    
-    // Déterminer le type MIME basé sur l'extension si le blob n'en a pas
-    let mimeType = fileBlob.type;
+    // 2. Ajuster le mime si nécessaire
+    let mimeType = blob.type;
     if (!mimeType || mimeType === 'application/octet-stream') {
-      const extension = fileName.split('.').pop()?.toLowerCase();
-      switch (extension) {
+      const ext = fileName.split('.').pop()?.toLowerCase();
+      switch (ext) {
         case 'png': mimeType = 'image/png'; break;
         case 'jpg': case 'jpeg': mimeType = 'image/jpeg'; break;
         case 'gif': mimeType = 'image/gif'; break;
@@ -116,154 +115,139 @@ export const useDropboxImport = () => {
         default: mimeType = 'application/octet-stream';
       }
     }
-    
-    logger.info('Fichier téléchargé - taille:', fileBlob.size, 'type original:', fileBlob.type, 'type final:', mimeType);
-    
-    // Étape 2: Créer un objet File
-    const file = new File([fileBlob], fileName, { type: mimeType });
 
-    // Étape 3: Uploader le fichier vers le disque local via FileUploadService
-    return new Promise((resolve, reject) => {
+    // 3. Créer File et uploader via FileUploadService
+    const file = new File([blob], fileName, { type: mimeType });
+    await new Promise<void>((resolve, reject) => {
       FileUploadService.resetStates([file.name]);
       FileUploadService.upload([{ root: file.name, file }], {
-        context: {
-          companyId: company,
-          parentId: targetFolderId,
-        },
+        context: { companyId: company, parentId: targetFolderId },
         callback: async (filePayload, context) => {
           try {
-            const uploadedFile = filePayload.file;
-            if (uploadedFile) {
-              // Créer l'item dans le drive
-              await DriveApiClient.create(context.companyId, {
-                item: {
-                  company_id: context.companyId,
-                  workspace_id: 'drive',
-                  parent_id: context.parentId,
-                  name: uploadedFile.metadata?.name,
-                  size: uploadedFile.upload_data?.size,
-                },
-                version: {
-                  provider: 'internal',
-                  application_id: '',
-                  file_metadata: {
-                    name: uploadedFile.metadata?.name,
-                    size: uploadedFile.upload_data?.size,
-                    mime: uploadedFile.metadata?.mime,
-                    thumbnails: uploadedFile?.thumbnails,
-                    source: 'internal',
-                    external_id: uploadedFile.id,
-                  },
-                },
-              });
-              logger.info('Fichier importé avec succès:', fileName);
-              resolve();
-            } else {
-              reject(new Error('Échec de l\'upload du fichier'));
-            }
-          } catch (error) {
-            logger.error('Erreur lors de la création de l\'item:', error);
-            reject(error);
+            const uploaded = filePayload.file;
+            if (!uploaded) throw new Error('Échec de l’upload');
+            // créer l’entrée Drive
+            await DriveApiClient.create(context.companyId, {
+              item: {
+                company_id: context.companyId,
+                workspace_id: 'drive',
+                parent_id: context.parentId,
+                name: uploaded.metadata?.name,
+                size: uploaded.upload_data?.size
+              },
+              version: {
+                provider: 'internal',
+                application_id: '',
+                file_metadata: {
+                  name: uploaded.metadata?.name,
+                  size: uploaded.upload_data?.size,
+                  mime: uploaded.metadata?.mime,
+                  thumbnails: uploaded.thumbnails,
+                  source: 'internal',
+                  external_id: uploaded.id
+                }
+              }
+            });
+            logger.info('Fichier importé:', fileName);
+            resolve();
+          } catch (e) {
+            logger.error('Erreur création item Drive:', e);
+            reject(e);
           }
-        },
+        }
       });
     });
-  }, [user?.email, user?.id, company]);
+  }, [backendUrl, authHeader, company, user?.email]);
 
   /**
-   * Importer plusieurs fichiers Dropbox
-   */
-  const importDropboxFiles = useCallback(async (
-    files: Array<{ path: string; name: string; is_directory: boolean }>,
-    options: DropboxImportOptions = {}
-  ): Promise<void> => {
-    const { targetFolderId = 'user_' + user?.id } = options;
-    
-    setImporting(true);
-    setImportProgress({ current: 0, total: files.length, currentFile: '' });
-
-    try {
-      let imported = 0;
-      
-      for (const file of files) {
-        if (file.is_directory) {
-          // Ignorer les dossiers pour le moment
-          continue;
-        }
-
-        setImportProgress({ 
-          current: imported, 
-          total: files.length, 
-          currentFile: file.name 
-        });
-
-        try {
-          await importDropboxFile(file.path, file.name, targetFolderId);
-          imported++;
-        } catch (error) {
-          logger.error(`Erreur lors de l'import de ${file.name}:`, error);
-          ToasterService.error(
-            `Erreur lors de l'import de ${file.name}: ${error instanceof Error ? error.message : 'Erreur inconnue'}`
-          );
-        }
-      }
-
-      setImportProgress({ 
-        current: imported, 
-        total: files.length, 
-        currentFile: '' 
-      });
-
-      if (imported > 0) {
-        ToasterService.success(
-          `${imported} fichier(s) importé(s) avec succès depuis Dropbox`
-        );
-        // Rafraîchir la vue actuelle
-        await refresh(targetFolderId);
-      }
-
-    } catch (error) {
-      logger.error('Erreur lors de l\'import Dropbox:', error);
-      ToasterService.error(
-        `Erreur lors de l'import: ${error instanceof Error ? error.message : 'Erreur inconnue'}`
-      );
-    } finally {
-      setImporting(false);
-      setImportProgress(null);
-    }
-  }, [user?.id, importDropboxFile, refresh]);
-
-  /**
-   * Importer tous les fichiers d'un dossier Dropbox
+   * Importe **tous** les fichiers (flatten) d’un dossier Dropbox
    */
   const importDropboxFolder = useCallback(async (
     dropboxPath: string = '',
     options: DropboxImportOptions = {}
-  ): Promise<void> => {
+  ) => {
+    const targetFolderId = options.targetFolderId || `user_${user!.id}`;
+    setImporting(true);
+  
     try {
-      const files = await getDropboxFiles(dropboxPath);
-      const fileItems = files.filter(f => !f.is_directory);
-      
-      if (fileItems.length === 0) {
-        ToasterService.info('Aucun fichier à importer dans ce dossier Dropbox');
+      // 1) récupérer récursivement tous les fichiers
+      const files = await getAllDropboxFiles(dropboxPath);
+  
+      // 2) log de la liste complète
+      console.log('📥 Tous les fichiers à importer :', files.map(f => f.name));
+      if (files.length === 0) {
+        ToasterService.info('Aucun fichier à importer');
         return;
       }
-
-      await importDropboxFiles(fileItems, options);
-    } catch (error) {
-      logger.error('Erreur lors de l\'import du dossier Dropbox:', error);
-      ToasterService.error(
-        `Erreur lors de l'import du dossier: ${error instanceof Error ? error.message : 'Erreur inconnue'}`
-      );
+  
+      // 3) prépare un cache des dossiers déjà créés
+      const folderMap = new Map<string,string>();
+      // la racine ("") correspond à targetFolderId
+      folderMap.set('', targetFolderId);
+  
+      let importedCount = 0;
+  
+      // 4) pour chaque fichier, on s’assure que son chemin de dossiers existe
+      for (const { path, name } of files) {
+        // découpe « sous1/sous2/fichier.ext » → ['sous1','sous2','fichier.ext']
+        const segments = path.split('/');
+        let parentId = targetFolderId;
+        let cumulativePath = '';
+  
+        // on ne prend que les segments de dossiers, sauf le dernier (le fichier)
+        for (let i = 0; i < segments.length - 1; i++) {
+          const seg = segments[i];
+          cumulativePath = cumulativePath
+            ? `${cumulativePath}/${seg}`
+            : seg;
+  
+          // si ce dossier n’est pas encore créé
+          if (!folderMap.has(cumulativePath)) {
+            // créer le dossier
+            const folderItem = await DriveApiClient.create(company, {
+              item: {
+                company_id: company,
+                workspace_id: 'drive',
+                parent_id: parentId,
+                name: seg,
+                is_directory: true
+              }
+            });
+            // mémoriser son id
+            folderMap.set(cumulativePath, folderItem.id);
+          }
+          parentId = folderMap.get(cumulativePath)!;
+        }
+  
+        // 5) importer le fichier dans parentId
+        setImportProgress({ current: importedCount, total: files.length, currentFile: name });
+        try {
+          await importDropboxFile(path, name, parentId);
+          importedCount++;
+        } catch (e) {
+          logger.error(`Erreur import ${name}:`, e);
+          ToasterService.error(`Échec import ${name}: ${(e as Error).message}`);
+        }
+      }
+  
+      // 6) feedback final
+      ToasterService.success(`${importedCount}/${files.length} fichier(s) importé(s)`);
+      await refresh(targetFolderId);
+  
+    } catch (err) {
+      logger.error('Erreur import dossier:', err);
+      ToasterService.error(`Erreur import: ${(err as Error).message}`);
+    } finally {
+      setImportProgress(null);
+      setImporting(false);
     }
-  }, [getDropboxFiles, importDropboxFiles]);
+  }, [getAllDropboxFiles, importDropboxFile, refresh, user?.id]);
+  
 
   return {
     importing,
     importProgress,
     getDropboxFiles,
-    importDropboxFile,
-    importDropboxFiles,
-    importDropboxFolder,
+    importDropboxFolder
   };
 };
