@@ -374,21 +374,35 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
         }
       }
       
-      // === PHASE 2: Création des dossiers (seulement si nécessaire) ===
+      // === PHASE 2: Création des dossiers (seulement ceux à synchroniser) ===
+      
+      // Filtrer les dossiers à créer selon le diagnostic conditionnel
+      const foldersToSync = analyzeData.diagnostic.toSync?.folders || [];
+      const foldersToSyncPaths = foldersToSync.map((f: any) => f.path || f.name);
+      const filteredFoldersToCreate = foldersToCreate.filter((folderPath: string) => {
+        // Créer le dossier si lui-même ou un de ses parents est à synchroniser
+        return foldersToSyncPaths.some((syncPath: string) => 
+          syncPath.startsWith(folderPath) || folderPath.startsWith(syncPath)
+        );
+      });
+      
+      console.log(`📁 Dossiers à créer filtrés: ${filteredFoldersToCreate.length}/${foldersToCreate.length}`);
+      filteredFoldersToCreate.forEach(path => console.log(`  📁 ${path}`));
+      
       setImportProgress({ 
         current: 0, 
-        total: foldersToCreate.length + totalFiles, 
+        total: filteredFoldersToCreate.length + totalFiles, 
         currentFile: 'Création des dossiers...' 
       });
       
       const folderMap: Record<string, string> = {};
       
-      // Créer les dossiers dans l'ordre hiérarchique
-      for (let i = 0; i < foldersToCreate.length; i++) {
-        const folderPath = foldersToCreate[i];
+      // Créer seulement les dossiers filtrés
+      for (let i = 0; i < filteredFoldersToCreate.length; i++) {
+        const folderPath = filteredFoldersToCreate[i];
         setImportProgress({ 
           current: i + 1, 
-          total: foldersToCreate.length + totalFiles, 
+          total: filteredFoldersToCreate.length + totalFiles, 
           currentFile: `Création du dossier: ${folderPath}` 
         });
         
