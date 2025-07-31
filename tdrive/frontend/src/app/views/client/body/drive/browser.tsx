@@ -365,7 +365,7 @@ export default memo(
       const dropboxPath = parentId === 'dropbox_root' ? '' : parentId.replace('dropbox_', '').replace(/_/g, '/');
       
       try {
-        await importDropboxFolder(dropboxPath, { targetFolderId: 'user_' + user?.id });
+        await importDropboxFolder(dropboxPath, 'user_' + user?.id);
       } catch (error) {
         console.error('Erreur lors de la synchronisation Dropbox:', error);
       }
@@ -557,6 +557,24 @@ export default memo(
                     />
                     <span>
                       {importing ? 'Synchronisation...' : 'Synchroniser avec Mon disque'}
+                    </span>
+                  </Button>
+                )}
+                
+                {/* Bouton d'import Dropbox dans My Drive */}
+                {!isDropboxView && viewId === 'user_' + user?.id && buttonsVisible && (
+                  <Button
+                    theme="outline"
+                    className="ml-4 flex flex-row items-center border-0 md:border !text-gray-500 md:!text-blue-500 px-0 md:px-4"
+                    onClick={() => importDropboxFolder('', 'user_' + user?.id)}
+                    disabled={importing}
+                    testClassId="button-import-dropbox"
+                  >
+                    <RefreshIcon 
+                      className={`h-4 w-4 mr-2 -ml-1 ${importing ? 'animate-spin' : ''}`} 
+                    />
+                    <span>
+                      {importing ? 'Import en cours...' : 'Importer depuis Dropbox'}
                     </span>
                   </Button>
                 )}
