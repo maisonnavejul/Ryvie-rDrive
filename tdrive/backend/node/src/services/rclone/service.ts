@@ -276,7 +276,8 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
     driveParentId: string,
     userEmail: string,
     executionContext: any,
-    folderMap: Record<string, string> // Map: chemin dossier -> ID dossier Twake
+    folderMap: Record<string, string>, // Map: chemin dossier -> ID dossier Twake
+    filesToSync?: any[] // Liste optionnelle de fichiers filtrés à synchroniser
   ): Promise<{ success: boolean; message: string; filesProcessed: number }> {
     
     // Mettre à jour le remote pour cet utilisateur
@@ -286,13 +287,26 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
     
     try {
       // 1. Lister tous les fichiers Dropbox récursivement
-      const remotePath = `${this.REMOTE_NAME}:${dropboxPath}`;
-      const listCommand = `rclone lsjson --recursive "${remotePath}"`;
-      logger.info(`📋 Listing files: ${listCommand}`);
+      let files: any[];
       
-      const { stdout } = await execAsync(listCommand);
-      const allItems = JSON.parse(stdout);
-      const files = allItems.filter((f: any) => !f.IsDir);
+      if (filesToSync && filesToSync.length > 0) {
+        // Utiliser les fichiers filtrés passés en paramètre
+        logger.info(`📋 Using filtered files list: ${filesToSync.length} files`);
+        files = filesToSync.map((f: any) => ({
+          Path: f.path || f.name, // Utiliser le path ou le nom
+          Name: f.name,
+          Size: f.sizeKB * 1024 // Convertir KB en bytes
+        }));
+      } else {
+        // Lister tous les fichiers Dropbox récursivement (comportement par défaut)
+        const remotePath = `${this.REMOTE_NAME}:${dropboxPath}`;
+        const listCommand = `rclone lsjson --recursive "${remotePath}"`;
+        logger.info(`📋 Listing all files: ${listCommand}`);
+        
+        const { stdout } = await execAsync(listCommand);
+        const allItems = JSON.parse(stdout);
+        files = allItems.filter((f: any) => !f.IsDir);
+      }
       
       logger.info(`📊 Found ${files.length} files to sync`);
       
@@ -1126,10 +1140,213 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
         
         logger.info(`📁 Found ${foldersArray.length} folders to create:`, foldersArray);
         
+        // === DIAGNOSTIC COMPLET (avant synchronisation) ===
+        let diagnosticData = null;
+        try {
+          logger.info('\n🚀 === DIAGNOSTIC: LISTING CONTENT FOR COMPARISON ===');
+          
+          // 1. LISTER DROPBOX CONTENT
+          const allDropboxItems = JSON.parse(stdout);
+          const dropboxFolders = allDropboxItems.filter((f: any) => f.IsDir);
+          const dropboxAllFiles = allDropboxItems.filter((f: any) => !f.IsDir);
+          
+          // Filtrer pour ne garder que les fichiers à la racine (pas dans des sous-dossiers)
+          const dropboxRootFiles = dropboxAllFiles.filter((f: any) => !f.Path.includes('/'));
+          
+          // Calculer la taille des dossiers
+          const foldersWithSize = dropboxFolders.map((folder: any) => {
+            const folderFiles = dropboxAllFiles.filter((f: any) => f.Path.startsWith(folder.Path + '/'));
+            const totalSize = folderFiles.reduce((sum: number, f: any) => sum + f.Size, 0);
+            return {
+              name: folder.Name,
+              path: folder.Path,
+              sizeKB: Math.round(totalSize / 1024)
+            };
+          });
+          
+          logger.info(`📁 DROPBOX FOLDERS (${foldersWithSize.length}):`);
+          foldersWithSize.forEach((folder: any) => {
+            logger.info(`  📁 ${folder.name} - ${folder.sizeKB} KB`);
+          });
+          
+          logger.info(`📄 DROPBOX FILES (racine uniquement) (${dropboxRootFiles.length}):`);
+          dropboxRootFiles.forEach((file: any) => {
+            const sizeKB = Math.round(file.Size / 1024);
+            logger.info(`  📄 ${file.Path} (${file.Name}) - ${sizeKB} KB`);
+          });
+          
+          // 2. LISTER MYDRIVE CONTENT (si driveParentId fourni)
+          const driveParentId = request.body.driveParentId;
+          if (driveParentId) {
+            logger.info('\n🗂️ === MYDRIVE CONTENT ===');
+            
+            const executionContext = {
+              company: { id: 'af114530-5cc6-11f0-8de8-f78b546249a5' },
+              user: { 
+                id: request.user?.id || '4e272180-5cc7-11f0-917c-559ae224df7f',
+                email: userEmail,
+                server_request: true,
+                application_id: null
+              }
+            };
+            
+            const browseResult = await globalResolver.services.documents.documents.browse(
+              driveParentId,
+              {},
+              executionContext
+            );
+            
+            const myDriveFolders = browseResult.children?.filter((item: any) => item.is_directory) || [];
+            const myDriveFiles = browseResult.children?.filter((item: any) => !item.is_directory) || [];
+            
+            // Calculer la taille des dossiers MyDrive (approximation basée sur les fichiers directs)
+            const myDriveFoldersWithSize = myDriveFolders.map((folder: any) => ({
+              name: folder.name,
+              id: folder.id,
+              sizeKB: Math.round((folder.size || 0) / 1024) // Taille du dossier si disponible
+            }));
+            
+            const myDriveRootFiles = myDriveFiles.map((file: any) => ({
+              name: file.name,
+              id: file.id,
+              sizeKB: Math.round((file.size || 0) / 1024)
+            }));
+            
+            logger.info(`📁 MYDRIVE FOLDERS (${myDriveFoldersWithSize.length}):`);
+            myDriveFoldersWithSize.forEach((folder: any) => {
+              logger.info(`  📁 ${folder.name} - ${folder.sizeKB} KB`);
+            });
+            
+            logger.info(`📄 MYDRIVE FILES (racine uniquement) (${myDriveRootFiles.length}):`);
+            myDriveRootFiles.forEach((file: any) => {
+              logger.info(`  📄 ${file.name} - ${file.sizeKB} KB`);
+            });
+            
+            // === LOGIQUE DE SYNCHRONISATION CONDITIONNELLE ===
+            const TOLERANCE_KB = 1; // Tolérance de ±1KB
+            
+            // Analyser les dossiers à synchroniser
+            const foldersToSync = foldersWithSize.filter((dbFolder: any) => {
+              const matchingFolder = myDriveFoldersWithSize.find((mdFolder: any) => 
+                mdFolder.name === dbFolder.name // Comparaison stricte
+              );
+              
+              if (!matchingFolder) {
+                logger.info(`✅ DOSSIER À SYNC: "${dbFolder.name}" (nouveau, ${dbFolder.sizeKB} KB)`);
+                return true; // Nouveau dossier
+              }
+              
+              const sizeDiff = Math.abs(dbFolder.sizeKB - matchingFolder.sizeKB);
+              if (sizeDiff > TOLERANCE_KB) {
+                logger.info(`✅ DOSSIER À SYNC: "${dbFolder.name}" (taille différente: ${dbFolder.sizeKB} KB vs ${matchingFolder.sizeKB} KB)`);
+                return true; // Taille différente
+              }
+              
+              logger.info(`❌ DOSSIER IGNORÉ: "${dbFolder.name}" (identique: ${dbFolder.sizeKB} KB)`);
+              return false; // Déjà à jour
+            });
+            
+            // Analyser les fichiers à synchroniser
+            const dropboxRootFilesFormatted = dropboxRootFiles.map((f: any) => ({
+              name: f.Name,
+              sizeKB: Math.round(f.Size / 1024)
+            }));
+            
+            const filesToSync = dropboxRootFilesFormatted.filter((dbFile: any) => {
+              const matchingFile = myDriveRootFiles.find((mdFile: any) => 
+                mdFile.name === dbFile.name // Comparaison stricte
+              );
+              
+              if (!matchingFile) {
+                logger.info(`✅ FICHIER À SYNC: "${dbFile.name}" (nouveau, ${dbFile.sizeKB} KB)`);
+                return true; // Nouveau fichier
+              }
+              
+              const sizeDiff = Math.abs(dbFile.sizeKB - matchingFile.sizeKB);
+              if (sizeDiff > TOLERANCE_KB) {
+                logger.info(`✅ FICHIER À SYNC: "${dbFile.name}" (taille différente: ${dbFile.sizeKB} KB vs ${matchingFile.sizeKB} KB)`);
+                return true; // Taille différente
+              }
+              
+              logger.info(`❌ FICHIER IGNORÉ: "${dbFile.name}" (identique: ${dbFile.sizeKB} KB)`);
+              return false; // Déjà à jour
+            });
+            
+            logger.info(`\n📊 RÉSULTAT ANALYSE: ${foldersToSync.length}/${foldersWithSize.length} dossiers à sync, ${filesToSync.length}/${dropboxRootFilesFormatted.length} fichiers à sync`);
+            
+            // Préparer les données pour le frontend
+            diagnosticData = {
+              dropbox: {
+                folders: foldersWithSize,
+                files: dropboxRootFilesFormatted
+              },
+              myDrive: {
+                folders: myDriveFoldersWithSize,
+                files: myDriveRootFiles
+              },
+              toSync: {
+                folders: foldersToSync,
+                files: filesToSync
+              }
+            };
+            
+            // 3. COMPARAISON
+            logger.info('\n🔍 === COMPARISON ANALYSIS ===');
+            
+            // Comparer les dossiers
+            logger.info('📁 FOLDER COMPARISON:');
+            dropboxFolders.forEach((dbFolder: any) => {
+              const matchingFolder = myDriveFolders.find((mdFolder: any) => {
+                const baseName = dbFolder.Name;
+                const pattern = new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(-\\d+)?$`);
+                return pattern.test(mdFolder.name);
+              });
+              
+              if (matchingFolder) {
+                logger.info(`  ✅ MATCH: Dropbox "${dbFolder.Name}" <-> MyDrive "${matchingFolder.name}"`);
+              } else {
+                logger.info(`  ❌ MISSING: Dropbox "${dbFolder.Name}" not found in MyDrive`);
+              }
+            });
+            
+            // Comparer les fichiers (racine uniquement)
+            logger.info('📄 FILE COMPARISON (racine uniquement):');
+            dropboxRootFiles.forEach((dbFile: any) => {
+              const matchingFile = myDriveFiles.find((mdFile: any) => {
+                const baseName = dbFile.Name.split('.')[0];
+                const extension = dbFile.Name.includes('.') ? '.' + dbFile.Name.split('.').pop() : '';
+                const pattern = new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(-\\d+)?${extension.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
+                
+                const nameMatch = pattern.test(mdFile.name);
+                const sizeMatch = Math.abs((mdFile.size || 0) - dbFile.Size) < 1024; // Tolérance 1KB
+                
+                return nameMatch && sizeMatch;
+              });
+              
+              const dbSizeKB = Math.round(dbFile.Size / 1024);
+              if (matchingFile) {
+                const mdSizeKB = Math.round((matchingFile.size || 0) / 1024);
+                logger.info(`  ✅ MATCH: Dropbox "${dbFile.Name}" (${dbSizeKB}KB) <-> MyDrive "${matchingFile.name}" (${mdSizeKB}KB)`);
+              } else {
+                logger.info(`  ❌ MISSING: Dropbox "${dbFile.Name}" (${dbSizeKB}KB) not found in MyDrive`);
+              }
+            });
+          } else {
+            logger.info('⚠️ No driveParentId provided, skipping MyDrive comparison');
+          }
+          
+          logger.info('🏁 === DIAGNOSTIC COMPLETE ===\n');
+          
+        } catch (diagError) {
+          logger.error('❌ Diagnostic logging failed:', diagError);
+        }
+        // === FIN LOGS DE DIAGNOSTIC ===
+        
         return reply.send({
           success: true,
           folders: foldersArray,
-          totalFiles: files.length
+          totalFiles: files.length,
+          diagnostic: diagnosticData // Données de diagnostic pour le frontend
         });
         
       } catch (error) {
@@ -1177,14 +1394,145 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
           transport: 'http' as const,
         };
         
-        const result = await this.syncDropboxWithFolderMap(dropboxPath, driveParentId, userEmail, executionContext, folderMap);
+        // === LOGIQUE DE SYNCHRONISATION CONDITIONNELLE (comme dans /analyze) ===
+        // Mettre à jour le remote pour cet utilisateur
+        this.currentUserEmail = userEmail;
+        this.REMOTE_NAME = this.getRemoteName(userEmail);
+        
+        // 1. LISTER DROPBOX CONTENT
+        const remotePath = `${this.REMOTE_NAME}:${dropboxPath}`;
+        const listCommand = `rclone lsjson --recursive "${remotePath}"`;
+        
+        const { stdout } = await execAsync(listCommand);
+        const allDropboxItems = JSON.parse(stdout);
+        const dropboxFolders = allDropboxItems.filter((f: any) => f.IsDir);
+        const dropboxAllFiles = allDropboxItems.filter((f: any) => !f.IsDir);
+        
+        // Filtrer pour ne garder que les fichiers à la racine (pas dans des sous-dossiers)
+        const dropboxRootFiles = dropboxAllFiles.filter((f: any) => !f.Path.includes('/'));
+        
+        // Calculer la taille des dossiers
+        const foldersWithSize = dropboxFolders.map((folder: any) => {
+          const folderFiles = dropboxAllFiles.filter((f: any) => f.Path.startsWith(folder.Path + '/'));
+          const totalSize = folderFiles.reduce((sum: number, f: any) => sum + f.Size, 0);
+          return {
+            name: folder.Name,
+            path: folder.Path,
+            sizeKB: Math.round(totalSize / 1024)
+          };
+        });
+        
+        // 2. LISTER MYDRIVE CONTENT
+        const browseResult = await globalResolver.services.documents.documents.browse(
+          driveParentId,
+          {},
+          executionContext
+        );
+        
+        const myDriveFolders = browseResult.children?.filter((item: any) => item.is_directory) || [];
+        const myDriveFiles = browseResult.children?.filter((item: any) => !item.is_directory) || [];
+        
+        const myDriveFoldersWithSize = myDriveFolders.map((folder: any) => ({
+          name: folder.name,
+          id: folder.id,
+          sizeKB: Math.round((folder.size || 0) / 1024)
+        }));
+        
+        const myDriveRootFiles = myDriveFiles.map((file: any) => ({
+          name: file.name,
+          id: file.id,
+          sizeKB: Math.round((file.size || 0) / 1024)
+        }));
+        
+        // 3. APPLIQUER LA LOGIQUE CONDITIONNELLE
+        const TOLERANCE_KB = 1; // Tolérance de ±1KB
+        
+        // Filtrer les fichiers à synchroniser
+        const dropboxRootFilesFormatted = dropboxRootFiles.map((f: any) => ({
+          name: f.Name,
+          path: f.Path,
+          sizeKB: Math.round(f.Size / 1024)
+        }));
+        
+        // Analyser les dossiers à synchroniser
+        const foldersToSync = foldersWithSize.filter((dbFolder: any) => {
+          const matchingFolder = myDriveFoldersWithSize.find((mdFolder: any) => 
+            mdFolder.name === dbFolder.name // Comparaison stricte
+          );
+          
+          if (!matchingFolder) {
+            logger.info(`✅ DOSSIER À SYNC: "${dbFolder.name}" (nouveau, ${dbFolder.sizeKB} KB)`);
+            return true; // Nouveau dossier
+          }
+          
+          const sizeDiff = Math.abs(dbFolder.sizeKB - matchingFolder.sizeKB);
+          if (sizeDiff > TOLERANCE_KB) {
+            logger.info(`✅ DOSSIER À SYNC: "${dbFolder.name}" (taille différente: ${dbFolder.sizeKB} KB vs ${matchingFolder.sizeKB} KB)`);
+            return true; // Taille différente
+          }
+          
+          logger.info(`❌ DOSSIER IGNORÉ: "${dbFolder.name}" (identique: ${dbFolder.sizeKB} KB)`);
+          return false; // Déjà à jour
+        });
+        
+        // Analyser les fichiers racine à synchroniser
+        const rootFilesToSync = dropboxRootFilesFormatted.filter((dbFile: any) => {
+          const matchingFile = myDriveRootFiles.find((mdFile: any) => 
+            mdFile.name === dbFile.name // Comparaison stricte
+          );
+          
+          if (!matchingFile) {
+            logger.info(`✅ FICHIER RACINE À SYNC: "${dbFile.name}" (nouveau, ${dbFile.sizeKB} KB)`);
+            return true; // Nouveau fichier
+          }
+          
+          const sizeDiff = Math.abs(dbFile.sizeKB - matchingFile.sizeKB);
+          if (sizeDiff > TOLERANCE_KB) {
+            logger.info(`✅ FICHIER RACINE À SYNC: "${dbFile.name}" (taille différente: ${dbFile.sizeKB} KB vs ${matchingFile.sizeKB} KB)`);
+            return true; // Taille différente
+          }
+          
+          logger.info(`❌ FICHIER RACINE IGNORÉ: "${dbFile.name}" (identique: ${dbFile.sizeKB} KB)`);
+          return false; // Déjà à jour
+        });
+        
+        // Ajouter tous les fichiers des dossiers à synchroniser
+        const folderFilesToSync: any[] = [];
+        for (const folder of foldersToSync) {
+          const folderFiles = dropboxAllFiles.filter((f: any) => f.Path.startsWith(folder.path + '/'));
+          folderFiles.forEach((file: any) => {
+            folderFilesToSync.push({
+              name: file.Name,
+              path: file.Path,
+              sizeKB: Math.round(file.Size / 1024)
+            });
+            logger.info(`✅ FICHIER DOSSIER À SYNC: "${file.Path}" (dans dossier ${folder.name})`);
+          });
+        }
+        
+        // Combiner tous les fichiers à synchroniser
+        const allFilesToSync = [...rootFilesToSync, ...folderFilesToSync];
+        
+        logger.info(`\n📊 SYNC CONDITIONNEL: ${allFilesToSync.length} fichiers à synchroniser (${rootFilesToSync.length} racine + ${folderFilesToSync.length} dans dossiers)`);
+        
+        // Si aucun fichier à synchroniser, retourner directement
+        if (allFilesToSync.length === 0) {
+          logger.info('ℹ️ Aucun fichier à synchroniser (tout est à jour)');
+          return reply.send({
+            success: true,
+            message: 'Aucun fichier à synchroniser - tout est à jour',
+            filesProcessed: 0
+          });
+        }
+        
+        // Synchroniser seulement les fichiers filtrés
+        const result = await this.syncDropboxWithFolderMap(dropboxPath, driveParentId, userEmail, executionContext, folderMap, allFilesToSync);
         
         logger.info(`✅ Sync completed: ${result.message}`);
         return reply.send({
-          success: result.success,
+          success: true,
           message: result.message,
-          filesProcessed: result.filesProcessed,
-          details: result
+          filesProcessed: result.filesProcessed
         });
         
       } catch (error) {

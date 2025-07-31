@@ -293,7 +293,8 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
         },
         body: JSON.stringify({
           path: dropboxPath,
-          userEmail: user.email
+          userEmail: user.email,
+          driveParentId: targetFolderId
         })
       });
       
@@ -308,21 +309,100 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
       
       logger.info(`📁 Found ${foldersToCreate.length} folders to create and ${totalFiles} files to sync`);
       
-      // === PHASE 2: Création des dossiers ===
+      // === AFFICHAGE DES DONNÉES DE DIAGNOSTIC (AVANT SYNCHRONISATION) ===
+      if (analyzeData.diagnostic) {
+        const { dropbox, myDrive } = analyzeData.diagnostic;
+        
+        console.log('\n📊 === DIAGNOSTIC DROPBOX vs MyDrive (AVANT SYNC) ===');
+        
+        console.log('\n📁 DROPBOX FOLDERS:');
+        dropbox.folders.forEach((folder: any) => {
+          console.log(`  📁 ${folder.name} - ${folder.sizeKB} KB`);
+        });
+        
+        console.log('\n📄 DROPBOX FILES (racine uniquement):');
+        dropbox.files.forEach((file: any) => {
+          console.log(`  📄 ${file.name} - ${file.sizeKB} KB`);
+        });
+        
+        console.log('\n🗂️ MYDRIVE FOLDERS:');
+        myDrive.folders.forEach((folder: any) => {
+          console.log(`  📁 ${folder.name} - ${folder.sizeKB} KB`);
+        });
+        
+        console.log('\n📄 MYDRIVE FILES (racine uniquement):');
+        myDrive.files.forEach((file: any) => {
+          console.log(`  📄 ${file.name} - ${file.sizeKB} KB`);
+        });
+        
+        console.log('\n📊 SUMMARY:');
+        console.log(`  Dropbox: ${dropbox.files.length} files, ${dropbox.folders.length} folders`);
+        console.log(`  MyDrive: ${myDrive.files.length} files, ${myDrive.folders.length} folders`);
+        
+        // Afficher les éléments à synchroniser
+        if (analyzeData.diagnostic.toSync) {
+          const { toSync } = analyzeData.diagnostic;
+          console.log('\n🔄 ÉLÉMENTS À SYNCHRONISER:');
+          console.log(`  📁 Dossiers: ${toSync.folders.length}/${dropbox.folders.length}`);
+          toSync.folders.forEach((folder: any) => {
+            console.log(`    ✅ ${folder.name} - ${folder.sizeKB} KB`);
+          });
+          console.log(`  📄 Fichiers: ${toSync.files.length}/${dropbox.files.length}`);
+          toSync.files.forEach((file: any) => {
+            console.log(`    ✅ ${file.name} - ${file.sizeKB} KB`);
+          });
+          
+          if (toSync.folders.length === 0 && toSync.files.length === 0) {
+            console.log('  ℹ️ Aucun élément à synchroniser (tout est à jour)');
+          }
+        }
+        
+        console.log('\n=== FIN DIAGNOSTIC (AVANT SYNC) ===\n');
+        
+        // Afficher aussi dans un toast pour l'utilisateur
+        const syncCount = analyzeData.diagnostic.toSync ? 
+          analyzeData.diagnostic.toSync.folders.length + analyzeData.diagnostic.toSync.files.length : 0;
+        ToasterService.info(`📊 Diagnostic: ${syncCount} éléments à synchroniser | Dropbox ${dropbox.files.length} fichiers, ${dropbox.folders.length} dossiers`);
+        
+        // Si rien à synchroniser, arrêter ici
+        if (syncCount === 0) {
+          console.log('ℹ️ Aucun élément à synchroniser - arrêt du processus');
+          setImportProgress(null);
+          setImporting(false);
+          ToasterService.success('✅ Synchronisation terminée - tout est à jour');
+          return;
+        }
+      }
+      
+      // === PHASE 2: Création des dossiers (seulement ceux à synchroniser) ===
+      
+      // Filtrer les dossiers à créer selon le diagnostic conditionnel
+      const foldersToSync = analyzeData.diagnostic.toSync?.folders || [];
+      const foldersToSyncPaths = foldersToSync.map((f: any) => f.path || f.name);
+      const filteredFoldersToCreate = foldersToCreate.filter((folderPath: string) => {
+        // Créer le dossier si lui-même ou un de ses parents est à synchroniser
+        return foldersToSyncPaths.some((syncPath: string) => 
+          syncPath.startsWith(folderPath) || folderPath.startsWith(syncPath)
+        );
+      });
+      
+      console.log(`📁 Dossiers à créer filtrés: ${filteredFoldersToCreate.length}/${foldersToCreate.length}`);
+      filteredFoldersToCreate.forEach(path => console.log(`  📁 ${path}`));
+      
       setImportProgress({ 
         current: 0, 
-        total: foldersToCreate.length + totalFiles, 
+        total: filteredFoldersToCreate.length + totalFiles, 
         currentFile: 'Création des dossiers...' 
       });
       
       const folderMap: Record<string, string> = {};
       
-      // Créer les dossiers dans l'ordre hiérarchique
-      for (let i = 0; i < foldersToCreate.length; i++) {
-        const folderPath = foldersToCreate[i];
+      // Créer seulement les dossiers filtrés
+      for (let i = 0; i < filteredFoldersToCreate.length; i++) {
+        const folderPath = filteredFoldersToCreate[i];
         setImportProgress({ 
           current: i + 1, 
-          total: foldersToCreate.length + totalFiles, 
+          total: filteredFoldersToCreate.length + totalFiles, 
           currentFile: `Création du dossier: ${folderPath}` 
         });
         
@@ -403,7 +483,7 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
       const filesProcessed = syncResult.filesProcessed || 0;
       
       if (syncResult.success) {
-        ToasterService.success(`✅ Synchronisation terminée ! ${totalCreated} dossiers créés, ${filesProcessed} fichiers synchronisés.`);
+        ToasterService.success(`✅ Synchronisation terminée ! ${totalCreated} dossiers créés, ${filesProcessed} fichiers traités.`);
       } else {
         ToasterService.warning(`⚠️ Synchronisation terminée avec des avertissements: ${syncResult.message}`);
       }
