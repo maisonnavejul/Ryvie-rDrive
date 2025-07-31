@@ -160,88 +160,262 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
   }, [backendUrl, authHeader, company, user?.email]);
 
   /**
-   * Importe **tous** les fichiers (flatten) d’un dossier Dropbox
+   * Crée tous les dossiers nécessaires en une seule passe
+   */
+  const createAllRequiredFolders = useCallback(async (
+    files: Array<{ path: string; name: string }>,
+    folderMap: Map<string, string>,
+    targetFolderId: string
+  ) => {
+    // Extraire tous les chemins de dossiers uniques
+    const folderPaths = new Set<string>();
+    files.forEach(({ path }) => {
+      const segments = path.split('/');
+      for (let i = 0; i < segments.length - 1; i++) {
+        const folderPath = segments.slice(0, i + 1).join('/');
+        folderPaths.add(folderPath);
+      }
+    });
+
+    // Trier par profondeur pour créer les dossiers parents en premier
+    const sortedPaths = Array.from(folderPaths).sort((a, b) => {
+      return a.split('/').length - b.split('/').length;
+    });
+
+    // Créer les dossiers séquentiellement
+    for (const folderPath of sortedPaths) {
+      if (!folderMap.has(folderPath)) {
+        const segments = folderPath.split('/');
+        const parentPath = segments.slice(0, -1).join('/');
+        const folderName = segments[segments.length - 1];
+        const parentId = folderMap.get(parentPath) || targetFolderId;
+
+        try {
+          const folderItem = await DriveApiClient.create(company, {
+            item: {
+              company_id: company,
+              workspace_id: 'drive',
+              parent_id: parentId,
+              name: folderName,
+              is_directory: true
+            }
+          });
+          folderMap.set(folderPath, folderItem.id);
+          logger.debug(`📁 Created folder: ${folderPath}`);
+        } catch (error) {
+          logger.error(`❌ Failed to create folder ${folderPath}:`, error);
+          throw error;
+        }
+      }
+    }
+  }, [company]);
+
+  /**
+   * Obtient l'ID du dossier parent pour un fichier donné
+   */
+  const getParentIdForFile = useCallback((
+    filePath: string,
+    folderMap: Map<string, string>,
+    targetFolderId: string
+  ): string => {
+    const segments = filePath.split('/');
+    if (segments.length === 1) {
+      return targetFolderId; // Fichier à la racine
+    }
+    const parentPath = segments.slice(0, -1).join('/');
+    return folderMap.get(parentPath) || targetFolderId;
+  }, []);
+
+  /**
+   * Importe un fichier avec retry automatique en cas d'échec
+   */
+  const importDropboxFileWithRetry = useCallback(async (
+    dropboxPath: string,
+    fileName: string,
+    targetFolderId: string,
+    maxRetries: number = 2
+  ): Promise<void> => {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+      try {
+        await importDropboxFile(dropboxPath, fileName, targetFolderId);
+        return; // Succès
+      } catch (error) {
+        lastError = error as Error;
+        logger.warn(`⚠️ Attempt ${attempt}/${maxRetries + 1} failed for ${fileName}:`, error);
+        
+        if (attempt <= maxRetries) {
+          // Attendre avant de réessayer (backoff exponentiel)
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    // Si on arrive ici, tous les essais ont échoué
+    throw lastError || new Error(`Failed to import ${fileName} after ${maxRetries + 1} attempts`);
+  }, [importDropboxFile]);
+
+  /**
+   * Synchronise un dossier entier depuis Dropbox vers Twake Drive en 2 phases
+   * Phase 1: Analyse de l'arborescence et création des dossiers
+   * Phase 2: Synchronisation des fichiers
    */
   const importDropboxFolder = useCallback(async (
-    dropboxPath: string = '',
+    dropboxPath: string,
+    targetFolderId: string,
     options: DropboxImportOptions = {}
-  ) => {
-    const targetFolderId = options.targetFolderId || `user_${user!.id}`;
-    setImporting(true);
-  
-    try {
-      // 1) récupérer récursivement tous les fichiers
-      const files = await getAllDropboxFiles(dropboxPath);
-  
-      // 2) log de la liste complète
-      console.log('📥 Tous les fichiers à importer :', files.map(f => f.name));
-      if (files.length === 0) {
-        ToasterService.info('Aucun fichier à importer');
-        return;
-      }
-  
-      // 3) prépare un cache des dossiers déjà créés
-      const folderMap = new Map<string,string>();
-      // la racine ("") correspond à targetFolderId
-      folderMap.set('', targetFolderId);
-  
-      let importedCount = 0;
-  
-      // 4) pour chaque fichier, on s’assure que son chemin de dossiers existe
-      for (const { path, name } of files) {
-        // découpe « sous1/sous2/fichier.ext » → ['sous1','sous2','fichier.ext']
-        const segments = path.split('/');
-        let parentId = targetFolderId;
-        let cumulativePath = '';
-  
-        // on ne prend que les segments de dossiers, sauf le dernier (le fichier)
-        for (let i = 0; i < segments.length - 1; i++) {
-          const seg = segments[i];
-          cumulativePath = cumulativePath
-            ? `${cumulativePath}/${seg}`
-            : seg;
-  
-          // si ce dossier n’est pas encore créé
-          if (!folderMap.has(cumulativePath)) {
-            // créer le dossier
-            const folderItem = await DriveApiClient.create(company, {
-              item: {
-                company_id: company,
-                workspace_id: 'drive',
-                parent_id: parentId,
-                name: seg,
-                is_directory: true
-              }
-            });
-            // mémoriser son id
-            folderMap.set(cumulativePath, folderItem.id);
-          }
-          parentId = folderMap.get(cumulativePath)!;
-        }
-  
-        // 5) importer le fichier dans parentId
-        setImportProgress({ current: importedCount, total: files.length, currentFile: name });
-        try {
-          await importDropboxFile(path, name, parentId);
-          importedCount++;
-        } catch (e) {
-          logger.error(`Erreur import ${name}:`, e);
-          ToasterService.error(`Échec import ${name}: ${(e as Error).message}`);
-        }
-      }
-  
-      // 6) feedback final
-      ToasterService.success(`${importedCount}/${files.length} fichier(s) importé(s)`);
-      await refresh(targetFolderId);
-  
-    } catch (err) {
-      logger.error('Erreur import dossier:', err);
-      ToasterService.error(`Erreur import: ${(err as Error).message}`);
-    } finally {
-      setImportProgress(null);
-      setImporting(false);
+  ): Promise<void> => {
+    if (!user?.email) {
+      throw new Error('Utilisateur non connecté');
     }
-  }, [getAllDropboxFiles, importDropboxFile, refresh, user?.id]);
+
+    if (importing) {
+      ToasterService.info('Une synchronisation est déjà en cours');
+      return;
+    }
+
+    setImporting(true);
+    setImportProgress({ current: 0, total: 0, currentFile: 'Initialisation de la synchronisation...' });
+
+    try {
+      logger.info(`🚀 Starting 2-phase Dropbox sync from ${dropboxPath} to ${targetFolderId}`);
+      
+      // === PHASE 1: Analyse de l'arborescence ===
+      setImportProgress({ current: 0, total: 0, currentFile: 'Analyse de l\'arborescence Dropbox...' });
+      
+      const analyzeResponse = await fetch(`${backendUrl}/api/v1/rclone/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authHeader
+        },
+        body: JSON.stringify({
+          path: dropboxPath,
+          userEmail: user.email
+        })
+      });
+      
+      if (!analyzeResponse.ok) {
+        const errorData = await analyzeResponse.json().catch(() => ({ message: analyzeResponse.statusText }));
+        throw new Error(`Erreur d'analyse: ${errorData.message}`);
+      }
+      
+      const analyzeData = await analyzeResponse.json();
+      const foldersToCreate: string[] = analyzeData.folders || [];
+      const totalFiles: number = analyzeData.totalFiles || 0;
+      
+      logger.info(`📁 Found ${foldersToCreate.length} folders to create and ${totalFiles} files to sync`);
+      
+      // === PHASE 2: Création des dossiers ===
+      setImportProgress({ 
+        current: 0, 
+        total: foldersToCreate.length + totalFiles, 
+        currentFile: 'Création des dossiers...' 
+      });
+      
+      const folderMap: Record<string, string> = {};
+      
+      // Créer les dossiers dans l'ordre hiérarchique
+      for (let i = 0; i < foldersToCreate.length; i++) {
+        const folderPath = foldersToCreate[i];
+        setImportProgress({ 
+          current: i + 1, 
+          total: foldersToCreate.length + totalFiles, 
+          currentFile: `Création du dossier: ${folderPath}` 
+        });
+        
+        try {
+          // Déterminer le dossier parent
+          const pathSegments = folderPath.split('/');
+          const folderName = pathSegments[pathSegments.length - 1];
+          const parentPath = pathSegments.slice(0, -1).join('/');
+          const parentId = parentPath && folderMap[parentPath] ? folderMap[parentPath] : targetFolderId;
+          
+          logger.debug(`📁 Creating folder: ${folderName} in parent ${parentId}`);
+          
+          // Créer le dossier via l'API standard Twake Drive
+          const folderItem = await DriveApiClient.create(company, {
+            item: {
+              company_id: company,
+              workspace_id: 'drive',
+              parent_id: parentId,
+              name: folderName,
+              is_directory: true
+            }
+          });
+          
+          folderMap[folderPath] = folderItem.id;
+          logger.debug(`✅ Created folder: ${folderPath} -> ${folderItem.id}`);
+          
+        } catch (error) {
+          logger.error(`❌ Failed to create folder ${folderPath}:`, error);
+          // Continuer même si un dossier échoue
+        }
+      }
+      
+      // === PHASE 3: Synchronisation des fichiers ===
+      setImportProgress({ 
+        current: foldersToCreate.length, 
+        total: foldersToCreate.length + totalFiles, 
+        currentFile: 'Synchronisation des fichiers...' 
+      });
+      
+      logger.info(`📁 Folder map created:`, folderMap);
+      
+      // Appel au backend pour synchroniser les fichiers avec la map des dossiers
+      const syncResponse = await fetch(`${backendUrl}/api/v1/rclone/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authHeader
+        },
+        body: JSON.stringify({
+          path: dropboxPath,
+          userEmail: user.email,
+          driveParentId: targetFolderId,
+          folderMap: folderMap
+        })
+      });
+      
+      if (!syncResponse.ok) {
+        const errorData = await syncResponse.json().catch(() => ({ message: syncResponse.statusText }));
+        throw new Error(`Erreur de synchronisation: ${errorData.message || syncResponse.statusText}`);
+      }
+      
+      const syncResult = await syncResponse.json();
+      
+      logger.info('✅ 2-phase sync completed:', syncResult);
+      
+      // Mettre à jour le progrès final
+      setImportProgress({ 
+        current: foldersToCreate.length + totalFiles, 
+        total: foldersToCreate.length + totalFiles, 
+        currentFile: 'Synchronisation terminée !' 
+      });
+      
+      // Rafraîchir l'affichage
+      await refresh(targetFolderId);
+      
+      // Afficher le résultat
+      const totalCreated = foldersToCreate.length;
+      const filesProcessed = syncResult.filesProcessed || 0;
+      
+      if (syncResult.success) {
+        ToasterService.success(`✅ Synchronisation terminée ! ${totalCreated} dossiers créés, ${filesProcessed} fichiers synchronisés.`);
+      } else {
+        ToasterService.warning(`⚠️ Synchronisation terminée avec des avertissements: ${syncResult.message}`);
+      }
+      
+    } catch (error) {
+      logger.error('❌ Sync failed:', error);
+      ToasterService.error(`Erreur lors de la synchronisation: ${(error as Error).message}`);
+    } finally {
+      setImporting(false);
+      setImportProgress(null);
+    }
+  }, [user, importing, backendUrl, authHeader, refresh]);
   
 
   return {
