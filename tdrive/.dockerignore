@@ -1,4 +1,10 @@
 docker-data/
 frontend/node_modules/
 frontend/build/
+backend/node/node_modules/
+backend/node/dist/
+connectors/*/node_modules/
+connectors/*/dist/
 docker/data/
+*.log
+.git

@@ -1,6 +1,6 @@
 class Environment {
   isProduction() {
-    return process.env?.NODE_ENV === "production";
+    return import.meta.env.MODE === "production";
   }
 }
 

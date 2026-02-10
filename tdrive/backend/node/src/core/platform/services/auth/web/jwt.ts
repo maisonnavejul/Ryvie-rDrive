@@ -11,7 +11,7 @@ import { CrudException } from "../../../framework/api/crud-service";
 const jwtPlugin: FastifyPluginCallback = async (fastify, _opts, next) => {
   fastify.register(cookie);
   fastify.register(fastifyJwt, {
-    secret: config.get("auth.jwt.secret"),
+    secret: config.get("auth.jwt.secret") as string,
     cookie: {
       cookieName: "X-AuthToken",
       signed: false,
