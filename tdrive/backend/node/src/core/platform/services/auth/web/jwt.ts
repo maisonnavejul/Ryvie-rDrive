@@ -19,6 +19,18 @@ const jwtPlugin: FastifyPluginCallback = async (fastify, _opts, next) => {
   });
 
   const authenticate = async (request: FastifyRequest) => {
+    request.log.info(`[AUTH] Cookies: ${JSON.stringify(request.cookies)}`);
+    request.log.info(`[AUTH] Authorization header: ${request.headers.authorization}`);
+    request.log.info(`[AUTH] Cookie header: ${request.headers.cookie}`);
+    
+    // Si le header Authorization n'est pas présent, essayer de copier le token depuis le cookie
+    if (!request.headers.authorization && request.cookies && request.cookies['X-AuthToken']) {
+      request.headers.authorization = `Bearer ${request.cookies['X-AuthToken']}`;
+      request.log.info(`[AUTH] Using token from cookie X-AuthToken`);
+    } else if (!request.headers.authorization) {
+      request.log.error(`[AUTH] No Authorization header and no X-AuthToken cookie found`);
+    }
+    
     const jwt: JwtType = await request.jwtVerify();
 
     // Verify the SID exists and is valid except tokens for the public link

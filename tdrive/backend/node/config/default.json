@@ -279,6 +279,7 @@
     "documents",
     "applications",
     "applications-api",
-    "tags"
+    "tags",
+    "oauth-service"
   ]
 }
