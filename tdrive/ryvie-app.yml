@@ -4,9 +4,10 @@ category:
   fr: Stockage
   en: Storage
 name: rDrive
-version: "0.0.1"
-buildId: 18
+version: "0.0.2"
+buildId: 19
 port: 3010
+sso: true
 description: 
   fr:
     "rDrive est une solution de stockage de fichiers auto-hébergée, sécurisée et facile à utiliser.

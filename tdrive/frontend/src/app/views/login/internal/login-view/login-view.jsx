@@ -7,6 +7,9 @@ import Button from 'components/buttons/button.jsx';
 import Input from 'components/inputs/input.jsx';
 import InitService from '@features/global/services/init-service';
 import { Typography } from 'antd';
+import OAuthAutoLaunch from './oauth-auto-launch';
+import OAuthService from '@features/auth/oauth-service';
+
 export default class LoginView extends Component {
   constructor() {
     super();
@@ -14,10 +17,37 @@ export default class LoginView extends Component {
     this.state = {
       login: LoginService,
       i18n: Languages,
+      oauthConfig: null,
+      oauthLoading: false,
     };
 
     LoginService.addListener(this);
     Languages.addListener(this);
+    
+    // Charger la configuration OAuth
+    this.loadOAuthConfig();
+  }
+  
+  async loadOAuthConfig() {
+    try {
+      const config = await OAuthService.getConfig();
+      this.setState({ oauthConfig: config });
+    } catch (error) {
+      console.error('Failed to load OAuth config:', error);
+    }
+  }
+  
+  async handleOAuthLogin() {
+    this.setState({ oauthLoading: true });
+    try {
+      const authUrl = await OAuthService.authorize('/oauth-callback');
+      if (authUrl) {
+        window.location.href = authUrl;
+      }
+    } catch (error) {
+      console.error('OAuth login failed:', error);
+      this.setState({ oauthLoading: false });
+    }
   }
   componentWillUnmount() {
     LoginService.removeListener(this);
@@ -47,6 +77,11 @@ export default class LoginView extends Component {
               {this.state.i18n.t('scenes.login.home.title')}
             </div>
           </div>
+          
+          {/* Composant de lancement automatique OAuth */}
+          {this.state.oauthConfig?.enabled && this.state.oauthConfig?.autoLaunch && (
+            <OAuthAutoLaunch />
+          )}
 
           {this.state.login.external_login_error && (
             <div id="identification_information" className="error-banner" role="alert">
@@ -127,6 +162,25 @@ export default class LoginView extends Component {
                   this.state.i18n.t('scenes.login.home.login_btn')
                 )}
               </Button>
+              
+              {/* Bouton OAuth manuel (si OAuth activé mais pas en auto-launch) */}
+              {this.state.oauthConfig?.enabled && !this.state.oauthConfig?.autoLaunch && (
+                <Button
+                  id="oauth_login_btn"
+                  type="button"
+                  className="medium full_width"
+                  style={{ marginBottom: 12, backgroundColor: '#4285f4', color: 'white' }}
+                  disabled={this.state.oauthLoading}
+                  onClick={() => this.handleOAuthLogin()}
+                >
+                  {this.state.oauthLoading ? (
+                    <span className="modern-spinner" aria-hidden="true" />
+                  ) : (
+                    this.state.oauthConfig?.buttonText || 'Se connecter avec OAuth'
+                  )}
+                </Button>
+              )}
+              
               {/* Sign-up entry removed per product requirement */}
             </div>
           )}

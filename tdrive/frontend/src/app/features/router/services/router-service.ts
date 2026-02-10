@@ -6,6 +6,7 @@ import short, { Translator } from 'short-uuid';
 import App from '@views/client/app';
 import Login from '@views/login/login';
 import Logout from '@views/login/logout';
+import OAuthCallback from '@views/login/oauth-callback';
 import Error from '@views/error';
 import Join from '@views/join';
 import PublicMainView from '@views/client/body/drive/shared-view';
@@ -73,6 +74,7 @@ class RouterServices extends Observable {
     SHARED: '/shared/:companyId/:appName/:documentId/t/:token',
     LOGIN: '/login',
     LOGOUT: '/logout',
+    OAUTH_CALLBACK: '/oauth-callback',
     ERROR: '/error',
     JOIN: '/join/:token',
   };
@@ -103,6 +105,15 @@ class RouterServices extends Observable {
       exact: true,
       key: 'logout',
       component: Logout,
+      options: {
+        withErrorBoundary: true,
+      },
+    },
+    {
+      path: this.pathnames.OAUTH_CALLBACK,
+      exact: true,
+      key: 'oauth_callback',
+      component: OAuthCallback,
       options: {
         withErrorBoundary: true,
       },
