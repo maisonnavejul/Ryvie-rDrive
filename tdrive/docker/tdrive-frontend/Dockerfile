@@ -1,12 +1,14 @@
 # ---------- First stage: build frontend ----------
 FROM node:lts-alpine AS build
 
+# Activer pnpm via corepack
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 WORKDIR /tdrive-react
 
-# Meilleur cache : d'abord les manifestes
-COPY frontend/package*.json ./
-# Use npm install instead of npm ci because dependencies were updated without regenerating lockfile
-RUN npm install --legacy-peer-deps
+# Meilleur cache : d'abord les manifestes + lockfile
+COPY frontend/package.json frontend/pnpm-lock.yaml frontend/.npmrc ./
+RUN pnpm install --frozen-lockfile
 
 # Copier les fichiers de config nécessaires pour le build Vite
 COPY frontend/tsconfig*.json frontend/vite.config.ts frontend/tailwind.config.js frontend/postcss.config.js ./
@@ -29,7 +31,7 @@ RUN if [ -f src/app/environment/environment.ts.dist ]; then \
     fi
 
 # Build Vite (les URLs sont injectées au runtime via config.js, pas au build)
-RUN npm run build
+RUN pnpm run build
 
 # Nettoyer pour réduire la taille de l'image
 RUN rm -rf node_modules src
