@@ -4,8 +4,8 @@ category:
   fr: Stockage
   en: Storage
 name: rDrive
-version: "0.0.2"
-buildId: 19
+version: "0.0.3"
+buildId: 20
 port: 3010
 sso: true
 description: 
