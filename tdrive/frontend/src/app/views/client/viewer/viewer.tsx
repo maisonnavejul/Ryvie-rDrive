@@ -1,5 +1,5 @@
 import { Transition } from '@headlessui/react';
-import { ChevronLeftIcon, ChevronRightIcon, XIcon } from '@heroicons/react/outline';
+import { ChevronLeftIcon, ChevronRightIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useEffect, useState } from 'react';
 import { fadeTransition, fadeZoomTransition } from '../../../../utils/transitions';
 import Controls from './controls';
@@ -91,7 +91,7 @@ const Navigation = () => {
 
   return (
     <>
-      <XIcon
+      <XMarkIcon
         className="z-10 cursor-pointer absolute right-5 top-5 w-12 h-12 text-zinc-300 hover:text-white rounded-full p-1 hover:bg-black hover:bg-opacity-25 testid:button-close"
         onClick={() => close()}
       />

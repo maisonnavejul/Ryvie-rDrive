@@ -1,14 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ComponentStory } from '@storybook/react';
+import { StoryFn } from '@storybook/react';
 import { Badge } from '.';
-import { PlusIcon, SearchIcon } from '@heroicons/react/solid';
-import { TrashIcon } from '@heroicons/react/outline';
+import { PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/solid';
+import { TrashIcon } from '@heroicons/react/24/outline';
 
 export default {
   title: '@atoms/button',
 };
 
-const Template: ComponentStory<any> = (props: {
+const Template: StoryFn<any> = (props: {
   text: string;
   disabled: boolean;
   loading: boolean;

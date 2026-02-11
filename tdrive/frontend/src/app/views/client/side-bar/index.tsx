@@ -3,13 +3,13 @@ import React, { useState, useRef } from 'react';
 import {
   ClockIcon,
   CloudIcon,
-  ExternalLinkIcon,
+  ArrowTopRightOnSquareIcon,
   HeartIcon,
   ShareIcon,
   TrashIcon,
   UserIcon,
   UserGroupIcon,
-} from '@heroicons/react/outline';
+} from '@heroicons/react/24/outline';
 import { useEffect, useCallback } from 'react';
 import useRouterCompany from '@features/router/hooks/use-router-company';
 import { useCurrentUser } from 'app/features/users/hooks/use-current-user';
@@ -494,7 +494,7 @@ export default () => {
               theme="white"
               className={'w-full mb-1 ' + (inTrash ? activeClass : '')}
             >
-              <ExternalLinkIcon className="w-5 h-5 mr-4" /> Shared by me
+              <ArrowTopRightOnSquareIcon className="w-5 h-5 mr-4" /> Shared by me
             </Button>
           </>
         )}

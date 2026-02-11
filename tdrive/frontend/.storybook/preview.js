@@ -1,20 +1,21 @@
 import '../src/tailwind.css';
 
-export const parameters = {
-  actions: { argTypesRegex: '^on[A-Z].*' },
-  controls: {
-    matchers: {
-      color: /(background|color)$/i,
-      date: /Date$/,
+/** @type { import('@storybook/react').Preview } */
+const preview = {
+  parameters: {
+    controls: {
+      matchers: {
+        color: /(background|color)$/i,
+        date: /Date$/,
+      },
+    },
+    darkMode: {
+      stylePreview: true,
+    },
+    docs: {
+      source: { type: 'code' },
     },
   },
-  previewTabs: {
-    'storybook/docs/panel': { index: -1 },
-  },
-  darkMode: {
-    stylePreview: true,
-  },
-  docs: {
-    source: { type: 'code' }
-  },
 };
+
+export default preview;

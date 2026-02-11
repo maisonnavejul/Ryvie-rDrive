@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
-import { ComponentStory } from '@storybook/react';
+import { StoryFn } from '@storybook/react';
 
 import * as Text from '.';
 
@@ -9,7 +9,7 @@ export default {
 };
 
 // More on component templates: https://storybook.js.org/docs/react/writing-stories/introduction#using-args
-const Template: ComponentStory<any> = (props: { text: string }) => (
+const Template: StoryFn<any> = (props: { text: string }) => (
   <>
     <Text.Title className="block">{props.text || 'Title'}</Text.Title>
     <br />

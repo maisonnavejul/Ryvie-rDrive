@@ -1,4 +1,4 @@
-import { DesktopComputerIcon } from '@heroicons/react/solid';
+import { ComputerDesktopIcon } from '@heroicons/react/24/solid';
 import { Base } from '@atoms/text';
 
 export const DriveItem = ({ className, onClick }: { className?: string; onClick: () => void }) => {
@@ -12,7 +12,7 @@ export const DriveItem = ({ className, onClick }: { className?: string; onClick:
         onClick();
       }}
     >
-      <DesktopComputerIcon className="h-5 w-5 shrink-0 text-blue-500 mr-2" />
+      <ComputerDesktopIcon className="h-5 w-5 shrink-0 text-blue-500 mr-2" />
       <div className="grow text-ellipsis whitespace-nowrap overflow-hidden">
         <Base className="!font-semibold">Device 1o</Base>
       </div>

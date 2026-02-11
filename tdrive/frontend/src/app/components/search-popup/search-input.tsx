@@ -1,4 +1,4 @@
-import { SearchIcon } from "@heroicons/react/solid";
+import { MagnifyingGlassIcon } from "@heroicons/react/24/solid";
 import { useEffect, useRef } from "react";
 import { useRecoilState } from "recoil";
 import { InputDecorationIcon } from "@atoms/input/input-decoration-icon";
@@ -29,7 +29,7 @@ export const SearchInput = () => {
                   <Loader className="h-4 w-4" />
                 </div>
               )
-            : SearchIcon
+            : MagnifyingGlassIcon
         }
         input={({ className }) => (
           <Input

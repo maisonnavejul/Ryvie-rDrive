@@ -8,7 +8,7 @@ import UserService from '@features/users/services/current-user-service';
 import { UserType } from '@features/users/types/user';
 import './user-card.scss';
 import useRouterCompany from '@features/router/hooks/use-router-company';
-import { TrashIcon } from '@heroicons/react/outline';
+import { TrashIcon } from '@heroicons/react/24/outline';
 
 type PropsType = {
   user: UserType;

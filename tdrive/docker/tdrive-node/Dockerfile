@@ -36,6 +36,7 @@ COPY --from=build /usr/src/app/config ./config
 COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY backend/node/package*.json ./
 COPY backend/node/bin ./bin
+COPY backend/node/locales ./locales
 
 EXPOSE 4000
 CMD ["npm", "run", "serve"]

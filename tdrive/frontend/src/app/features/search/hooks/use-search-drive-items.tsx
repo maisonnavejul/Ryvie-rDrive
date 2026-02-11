@@ -27,7 +27,7 @@ export const useSearchDriveItems = () => {
 
   const opt = _.omitBy(
     {
-      limit: 25,
+      limit: 50,
       workspace_id: searchInput.workspaceId,
       company_id: companyId,
       channel_id: searchInput.channelId,
@@ -78,7 +78,7 @@ export const useSearchDriveItems = () => {
           if (searchInput.query) {
             delayRequest('useSearchDriveItems', async () => {
               await refresh();
-            });
+            }, { timeout: 300, doInitialCall: true });
           } else {
             refresh();
           }

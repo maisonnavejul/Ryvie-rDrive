@@ -1,5 +1,5 @@
 import { Input } from '@atoms/input/input-text';
-import { SearchIcon } from '@heroicons/react/outline';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { InputDecorationIcon } from '@atoms/input/input-decoration-icon';
 import Languages from '@features/global/services/languages-service';
 import RouterServices from '@features/router/services/router-service';
@@ -28,7 +28,7 @@ export default (): JSX.Element => {
       <div className="w-full max-w-lg testid:header-search">
         <InputDecorationIcon
           prefix={() => (
-            <SearchIcon className={'h-5 w-5 absolute m-auto top-0 bottom-0 left-3 text-blue-500'} />
+            <MagnifyingGlassIcon className={'h-5 w-5 absolute m-auto top-0 bottom-0 left-3 text-blue-500'} />
           )}
           suffix={() =>
             <XIcon

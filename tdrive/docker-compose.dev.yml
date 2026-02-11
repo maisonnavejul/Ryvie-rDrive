@@ -219,6 +219,7 @@ services:
       - DEV=production
       - SSL_CERTS=off
       - NODE_HOST=http://node:4000
+      - ONLYOFFICE_CONNECTOR_HOST=http://host.docker.internal:5000
       - REACT_APP_FRONTEND_URL=${REACT_APP_FRONTEND_URL}
       - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL}
       - REACT_APP_WEBSOCKET_URL=${REACT_APP_WEBSOCKET_URL}
@@ -228,6 +229,8 @@ services:
     ports:
       - 3010:80
       - 8443:443
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     depends_on:
       node:

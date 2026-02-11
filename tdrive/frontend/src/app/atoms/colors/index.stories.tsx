@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
-import { ComponentStory } from '@storybook/react';
+import { StoryFn } from '@storybook/react';
 
 export default {
   title: '@atoms/colors',
 };
 
-const Template: ComponentStory<any> = () => {
+const Template: StoryFn<any> = () => {
   return (
     <>
       <div className="grid grid-cols-1 gap-8">

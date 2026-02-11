@@ -16,6 +16,8 @@ export class I18nService implements TdriveServiceProvider, Initializable {
       locales: ["en", "ru", "fr"],
       defaultLocale: "en",
       directory: path.resolve("./locales/"),
+      objectNotation: false,
+      updateFiles: false,
       logWarnFn: msg => logger.warn(msg),
       logErrorFn: msg => logger.error(msg),
     });

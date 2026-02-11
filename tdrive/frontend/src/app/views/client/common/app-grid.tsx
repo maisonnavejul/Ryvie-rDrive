@@ -1,4 +1,4 @@
-import { ViewGridIcon } from '@heroicons/react/outline';
+import { Squares2X2Icon } from '@heroicons/react/24/outline';
 import { Button } from '@atoms/button/button';
 import Menu from '@components/menus/menu';
 import { Base } from '../../../atoms/text';
@@ -47,7 +47,7 @@ export default ({ className }: { className?: string }): JSX.Element => {
         theme="default"
         size="md"
         className={'!rounded-full border-0 ' + className}
-        icon={() => <ViewGridIcon className="w-6 h-6 text-blue-500" />}
+        icon={() => <Squares2X2Icon className="w-6 h-6 text-blue-500" />}
         testClassId="app-grid-button"
       />
     </Menu>

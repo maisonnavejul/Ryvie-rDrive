@@ -9,7 +9,7 @@ import { Base } from '@atoms/text';
 import { Input } from 'app/atoms/input/input-text';
 import { CheckboxSlider } from 'app/atoms/input/input-checkbox-slider';
 import { Button } from 'app/atoms/button/button';
-import { ShieldCheckIcon, PencilAltIcon } from '@heroicons/react/outline';
+import { ShieldCheckIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import { ConfirmModal } from 'app/atoms/modal/confirm';
 
 import Styles from './styles';
@@ -91,7 +91,7 @@ return <>
                 }
               }}
               >
-                <PencilAltIcon className={Styles.SmallIconClasses + "ml-1 inline align-bottom"} />
+                <PencilSquareIcon className={Styles.SmallIconClasses + "ml-1 inline align-bottom"} />
             </a>
           }
         </Base>

@@ -12,7 +12,7 @@ import { Base, Info } from '@atoms/text';
 import { Input } from 'app/atoms/input/input-text';
 import { CheckboxSlider } from 'app/atoms/input/input-checkbox-slider';
 import { Button } from 'app/atoms/button/button';
-import { CalendarIcon, PencilAltIcon } from '@heroicons/react/outline';
+import { CalendarDaysIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import { ConfirmModal } from 'app/atoms/modal/confirm';
 
 import Styles from './styles';
@@ -83,7 +83,7 @@ export const ExpiryEditorRow = (props: {
     <BaseBlock
       className={"m-4" + (disabled ? Styles.Disabled.Yes : "") + ' testid:expiry-editor-row'}
       disabled={disabled}
-      avatar={<CalendarIcon className={Styles.SmallIconClasses} />}
+      avatar={<CalendarDaysIcon className={Styles.SmallIconClasses} />}
       title={
         <Base>
           <label htmlFor={chkExpiryId}>{Languages.t('components.public-link-security_expiration_title')}</label>
@@ -99,7 +99,7 @@ export const ExpiryEditorRow = (props: {
                   return false;
                 }}
                 >
-                  <PencilAltIcon className={Styles.SmallIconClasses + "ml-1 inline align-bottom"} />
+                  <PencilSquareIcon className={Styles.SmallIconClasses + "ml-1 inline align-bottom"} />
               </a>
 
               {(currentEditedValue || props.value) <= Date.now()

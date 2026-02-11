@@ -1,4 +1,4 @@
-import { ChevronDownIcon, DotsHorizontalIcon } from '@heroicons/react/outline';
+import { ChevronDownIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
 import { Button } from '@atoms/button/button';
 import { Title } from '@atoms/text';
 import Menu from '@components/menus/menu';
@@ -132,7 +132,7 @@ export const SharedFilesTable = () => {
                         theme={'secondary'}
                         size="sm"
                         className={'!rounded-full '}
-                        icon={DotsHorizontalIcon}
+                        icon={EllipsisHorizontalIcon}
                       />
                     </Menu>
                   </td>

@@ -1,4 +1,4 @@
-import { ChevronDownIcon, RefreshIcon, ViewGridIcon, ViewListIcon, TrashIcon, DotsVerticalIcon, DownloadIcon } from '@heroicons/react/outline';
+import { ChevronDownIcon, ArrowPathIcon, Squares2X2Icon, ListBulletIcon, TrashIcon, EllipsisVerticalIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { Button } from '@atoms/button/button';
 import { Base, BaseSmall, Subtitle, Title } from '@atoms/text';
 import Menu from '@components/menus/menu';
@@ -11,6 +11,7 @@ import { useDrivePrefetch } from '@features/drive/hooks/use-drive-prefetch';
 import { DriveItemSelectedList, DriveItemSort, DriveNavigationState } from '@features/drive/state/store';
 import { formatBytes } from '@features/drive/utils';
 import useRouterCompany from '@features/router/hooks/use-router-company';
+import useRouterWorkspace from '@features/router/hooks/use-router-workspace';
 import JWTStorage from '@features/auth/jwt-storage-service';
 import _ from 'lodash';
 import { memo, Suspense, useCallback, useEffect, useRef, useState, useMemo } from 'react';
@@ -53,6 +54,7 @@ import { useDriveActions } from '@features/drive/hooks/use-drive-actions';
 import { useCloudImport } from '@features/drive/hooks/use-cloud-import';
 import { ConfirmModalAtom } from './modals/confirm-move/index';
 import { useCurrentUser } from 'app/features/users/hooks/use-current-user';
+import UserAPIClient from 'app/features/users/api/user-api-client';
 import { ToasterService } from '@features/global/services/toaster-service';
 import { ConfirmModal } from './modals/confirm-move';
 import { useHistory } from 'react-router-dom';
@@ -82,6 +84,7 @@ export default memo(
   }) => {
     const { user } = useCurrentUser();
     const companyId = useRouterCompany();
+    const workspaceId = useRouterWorkspace();
     const history = useHistory();
     const role = user
       ? (user?.companies || []).find(company => company?.company.id === companyId)?.role
@@ -327,27 +330,46 @@ export default memo(
       setActiveIndex(null);
       setActiveChild(null);
       if (event.over) {
+        const draggedItem = event.active.data.current.child.props.item;
+        const targetFolderId = inTrash ? 'root' : event.over.data.current.child.props.item.id;
+
+        // Collect all items to move: if dragged item is checked, move all checked items
+        const checkedIds = Object.keys(checked).filter(id => checked[id]);
+        const isDraggedChecked = checkedIds.includes(draggedItem.id);
+        const itemsToMove = isDraggedChecked && checkedIds.length > 1
+          ? checkedIds.map(id => {
+              const found = children.find(c => c.id === id) || items.find(c => c.id === id);
+              return found || { id, name: id, parent_id: draggedItem.parent_id };
+            })
+          : [draggedItem];
+
+        const title = itemsToMove.length > 1
+          ? Languages.t('components.item_context_menu.move.modal_header') + ` ${itemsToMove.length} éléments`
+          : Languages.t('components.item_context_menu.move.modal_header') + ` '${draggedItem.name}'`;
+
         setConfirmModalState({
           open: true,
-          parent_id: inTrash ? 'root' : event.over.data.current.child.props.item.id,
+          parent_id: targetFolderId,
           mode: 'move',
-          title:
-            Languages.t('components.item_context_menu.move.modal_header') +
-            ` '${event.active.data.current.child.props.item.name}'`,
+          title,
           onSelected: async ids => {
-            await update(
-              {
-                parent_id: ids[0],
-              },
-              event.active.data.current.child.props.item.id,
-              event.active.data.current.child.props.item.parent_id,
-            );
+            for (const item of itemsToMove) {
+              await update(
+                { parent_id: ids[0] },
+                item.id,
+                item.parent_id || draggedItem.parent_id,
+              );
+            }
+            // Clear selection after move
+            setChecked({});
           },
         });
       }
     }
 
     function draggableMarkup(index: number, child: any) {
+      const ext = (child.extension || child.name?.split('.').pop() || '').toLowerCase();
+      const isOffice = officeExtensions.has(ext);
       const commonProps = {
         key: index,
         className:
@@ -359,6 +381,7 @@ export default memo(
         onCheck: (v: boolean) => setChecked(_.pickBy({ ...checked, [child.id]: v }, _.identity)),
         onBuildContextMenu: () => onBuildContextMenu(details, child),
         inPublicSharing,
+        ...(isOffice ? { onClick: () => openOnlyOfficeEditor(child) } : {}),
       };
       return isMobile ? (
         <DocumentRow {...commonProps} />
@@ -371,10 +394,11 @@ export default memo(
 
     // Infinite scroll
     const scrollViewer = useRef<HTMLDivElement>(null);
+    const isLoadingNextPage = useRef(false);
 
     const handleScroll = async () => {
       const el = scrollViewer.current;
-      if (!el) return;
+      if (!el || isLoadingNextPage.current) return;
       const { scrollTop, scrollHeight, clientHeight } = el;
       const nearBottom = scrollTop + clientHeight + VIRT_THRESHOLD >= scrollHeight;
 
@@ -383,9 +407,14 @@ export default memo(
         setVisibleRange((v: { start: number; end: number }) => ({ start: 0, end: Math.min(v.end + VIRT_PAGE_SIZE, itemsCount) }));
       }
 
-      // Continuer à charger côté store quand nécessaire
-      if (scrollTop > 0 && scrollTop + clientHeight >= scrollHeight) {
-        await loadNextPage(parentId);
+      // Charger la page suivante quand on approche du bas
+      if (nearBottom && !paginateItem.lastPage) {
+        isLoadingNextPage.current = true;
+        try {
+          await loadNextPage(parentId);
+        } finally {
+          isLoadingNextPage.current = false;
+        }
       }
     };
 
@@ -395,7 +424,21 @@ export default memo(
       return () => {
         scrollViewer.current?.removeEventListener('scroll', handleScroll);
       };
-    }, [parentId, loading]);
+    }, [parentId, loading, paginateItem.lastPage]);
+
+    // Auto-load next page when content doesn't fill the scroll area (no scrollbar)
+    useEffect(() => {
+      if (loading || paginateItem.lastPage || isLoadingNextPage.current) return;
+      const el = scrollViewer.current;
+      if (!el) return;
+      const timer = setTimeout(() => {
+        if (el.scrollHeight <= el.clientHeight && !paginateItem.lastPage) {
+          isLoadingNextPage.current = true;
+          loadNextPage(parentId).finally(() => { isLoadingNextPage.current = false; });
+        }
+      }, 200);
+      return () => clearTimeout(timer);
+    }, [loading, itemsCount, paginateItem.lastPage, parentId]);
 
     // Scroll to item in view
     const scrollTillItemInView = itemId && itemId?.length > 0;
@@ -511,20 +554,70 @@ export default memo(
       }
     }, [isGoogleDriveView, parentId, importDropboxFolder, user?.id, importingGoogleDrive]);
 
-    // View mode: list (default) or gallery, persisted in localStorage
+    // View mode: list (default) or gallery, persisted per user
+    const viewModeKey = `drive_view_mode_${user?.id || 'default'}`;
     const [viewMode, setViewMode] = useState<'list' | 'gallery'>(() => {
+      const fromPrefs = user?.preferences?.drive_view_mode;
+      if (fromPrefs === 'gallery' || fromPrefs === 'list') return fromPrefs;
       try {
-        const saved = localStorage.getItem('drive_view_mode');
+        const saved = localStorage.getItem(viewModeKey);
         return (saved === 'gallery' || saved === 'list') ? (saved as 'list' | 'gallery') : 'list';
       } catch {
         return 'list';
       }
     });
+
+    // Sync viewMode when user changes (account switch)
+    const prevUserIdRef = useRef(user?.id);
     useEffect(() => {
-      try { localStorage.setItem('drive_view_mode', viewMode); } catch {}
-    }, [viewMode]);
+      if (user?.id && user.id !== prevUserIdRef.current) {
+        prevUserIdRef.current = user.id;
+        const key = `drive_view_mode_${user.id}`;
+        const fromPrefs = user?.preferences?.drive_view_mode;
+        if (fromPrefs === 'gallery' || fromPrefs === 'list') {
+          setViewMode(fromPrefs);
+        } else {
+          try {
+            const saved = localStorage.getItem(key);
+            if (saved === 'gallery' || saved === 'list') setViewMode(saved);
+          } catch {}
+        }
+      }
+    }, [user?.id, user?.preferences?.drive_view_mode]);
+
+    // Persist viewMode changes
+    const viewModeRef = useRef(viewMode);
+    useEffect(() => {
+      if (viewModeRef.current === viewMode) return;
+      viewModeRef.current = viewMode;
+      try { localStorage.setItem(viewModeKey, viewMode); } catch {}
+      UserAPIClient.setUserPreferences({ drive_view_mode: viewMode });
+    }, [viewMode, viewModeKey]);
 
     const { open: openPreview } = useDrivePreview();
+
+    // Extensions that should open directly in OnlyOffice editor
+    const officeExtensions = new Set(['docx', 'doc', 'odt', 'xlsx', 'xls', 'ods', 'pptx', 'ppt', 'odp']);
+
+    const openOnlyOfficeEditor = useCallback((item: any) => {
+      const jwt = JWTStorage.getJWT();
+      // @ts-ignore
+      const connectorUrl = (window.APP_CONFIG?.ONLYOFFICE_CONNECTOR_URL) || import.meta.env.VITE_ONLYOFFICE_CONNECTOR_URL || `${window.location.protocol}//${window.location.host}`;
+      const fileId = item.last_version_cache?.file_metadata?.external_id || '';
+      const driveFileId = item.id;
+      const url = `${connectorUrl}/plugins/onlyoffice?token=${jwt}&workspace_id=${workspaceId}&company_id=${companyId}&file_id=${fileId}&drive_file_id=${driveFileId}`;
+      window.open(url, '_blank');
+    }, [workspaceId, companyId]);
+
+    const openFileItem = useCallback((item: any) => {
+      const ext = (item.extension || item.name?.split('.').pop() || '').toLowerCase();
+      if (officeExtensions.has(ext)) {
+        openOnlyOfficeEditor(item);
+      } else {
+        openPreview(item);
+        history.push(RouterServices.generateRouteFromState({ companyId, itemId: item.id }));
+      }
+    }, [openOnlyOfficeEditor, openPreview, history, companyId]);
 
     return (
       <>
@@ -707,12 +800,12 @@ export default memo(
                   >
                     {viewMode === 'list' ? (
                       <>
-                        <ViewGridIcon className="h-4 w-4 mr-2 -ml-1" />
+                        <Squares2X2Icon className="h-4 w-4 mr-2 -ml-1" />
                         <span>Galerie</span>
                       </>
                     ) : (
                       <>
-                        <ViewListIcon className="h-4 w-4 mr-2 -ml-1" />
+                        <ListBulletIcon className="h-4 w-4 mr-2 -ml-1" />
                         <span>Liste</span>
                       </>
                     )}
@@ -739,7 +832,7 @@ export default memo(
                       }}
                       testClassId="button-bulk-download"
                     >
-                      <DownloadIcon className="h-4 w-4 mr-2 -ml-1" />
+                      <ArrowDownTrayIcon className="h-4 w-4 mr-2 -ml-1" />
                       <span>Télécharger</span>
                     </Button>
 
@@ -766,7 +859,7 @@ export default memo(
                         className="ml-2 flex flex-row items-center bg-transparent md:bg-blue-500 md:bg-opacity-25 !text-gray-500 md:!text-blue-500 px-2 md:px-3"
                         testClassId="button-bulk-actions"
                       >
-                        <DotsVerticalIcon className="h-5 w-5" />
+                        <EllipsisVerticalIcon className="h-5 w-5" />
                       </Button>
                     </Menu>
                   </>
@@ -781,7 +874,7 @@ export default memo(
                     disabled={importingDropbox}
                     testClassId="button-dropbox-sync"
                   >
-                    <RefreshIcon 
+                    <ArrowPathIcon 
                       className={`h-4 w-4 mr-2 -ml-1 ${importingDropbox ? 'animate-spin' : ''}`} 
                     />
                     <span>
@@ -799,7 +892,7 @@ export default memo(
                     disabled={importingGoogleDrive}
                     testClassId="button-googledrive-sync"
                   >
-                    <RefreshIcon 
+                    <ArrowPathIcon 
                       className={`h-4 w-4 mr-2 -ml-1 ${importingGoogleDrive ? 'animate-spin' : ''}`} 
                     />
                     <span>
@@ -869,8 +962,7 @@ export default memo(
                       onOpenFile={(id: string) => {
                         const it = children.find(c => c.id === id) || items.find(c => c.id === id);
                         if (it && !it.is_directory) {
-                          openPreview(it);
-                          history.push(RouterServices.generateRouteFromState({ companyId, itemId: id }));
+                          openFileItem(it);
                         }
                       }}
                       onContextMenu={(it: any, evt: React.MouseEvent) => {
@@ -914,13 +1006,24 @@ export default memo(
                   {false && shouldVirtualize && visibleRange.end < itemsCount && null}
                   <DragOverlay>
                     {activeIndex ? (
-                      <DocumentRowOverlay
-                        className={
-                          (activeIndex === 0 ? 'rounded-t-md ' : '-mt-px ') +
-                          (activeIndex === items.length - 1 ? 'rounded-b-md ' : '')
-                        }
-                        item={activeChild}
-                      ></DocumentRowOverlay>
+                      <div className="relative">
+                        <DocumentRowOverlay
+                          className={
+                            (activeIndex === 0 ? 'rounded-t-md ' : '-mt-px ') +
+                            (activeIndex === items.length - 1 ? 'rounded-b-md ' : '')
+                          }
+                          item={activeChild}
+                        ></DocumentRowOverlay>
+                        {(() => {
+                          const checkedIds = Object.keys(checked).filter(id => checked[id]);
+                          const count = activeChild && checkedIds.includes(activeChild.id) ? checkedIds.length : 1;
+                          return count > 1 ? (
+                            <div className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center shadow-md z-50">
+                              {count}
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
                     ) : null}
                   </DragOverlay>
                   {selectRect && (

@@ -1,4 +1,4 @@
-import { CloudIcon } from "@heroicons/react/outline";
+import { CloudIcon } from "@heroicons/react/24/outline";
 import { formatBytesToInt } from "@features/drive/utils";
 import Languages from "features/global/services/languages-service";
 import { useUserQuota } from "@features/users/hooks/use-user-quota";

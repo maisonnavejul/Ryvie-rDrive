@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { useHistory } from 'react-router-dom';
 import { Transition } from '@headlessui/react';
 import { fadeTransition } from 'src/utils/transitions';
-import { DownloadIcon, XIcon, ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/outline';
+import { ArrowDownTrayIcon, XMarkIcon, ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import { addShortcut, removeShortcut } from '@features/global/services/shortcut-service';
 import RouterServices from '@features/router/services/router-service';
 import useRouterCompany from '@features/router/hooks/use-router-company';
@@ -115,7 +115,7 @@ export const DrivePreview: React.FC<DrivePreviewProps> = ({ items }) => {
       style={{ maxWidth: 'none', margin: 0, left: 0, top: 0, height: '100vh' }}
       positioned={false}
     >
-      <XIcon
+      <XMarkIcon
         className="z-10 cursor-pointer absolute right-5 top-5 w-20 h-20 text-white hover:text-black rounded-full p-1 bg-gray-500 hover:bg-white bg-opacity-25 testid:preview-button-close"
         onClick={() => {
           close();
@@ -182,7 +182,7 @@ export const DrivePreview: React.FC<DrivePreviewProps> = ({ items }) => {
               className="ml-4 !rounded-full"
               theme="dark"
               size="lg"
-              icon={DownloadIcon}
+              icon={ArrowDownTrayIcon}
               onClick= {() => {
                 download && (window.location.href = download);
               }}
