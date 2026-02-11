@@ -1,5 +1,5 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 
 import MenusManager from '@components/menus/menus-manager';
 import MenuComponent from './menu-component';
@@ -9,100 +9,107 @@ import MobileMenu from './mobile-menu';
 /*
   Where the menu will be displayed, this component should be in app.js (menus should be over all elements of the page)
 */
-export default class MenusBodyLayer extends React.Component {
-  constructor(props) {
-    super();
-    this.state = {
-      menus_manager: MenusManager,
-    };
-    this.menus_dom = null;
-    this.menu_observer = {};
-    MenusManager.addListener(this);
-    this.outsideMenuListener = this.outsideMenuListener.bind(this);
-    this.outsideMenuListenerUp = this.outsideMenuListenerUp.bind(this);
 
-    this.lastUpdatePosition = {};
-    this.indexUpdatePosition = {};
+function getOrCreatePortalRoot() {
+  let el = document.getElementById('context-menu-layer');
+  if (!el) {
+    el = document.createElement('div');
+    el.setAttribute('id', 'context-menu-layer');
+    document.body.appendChild(el);
   }
-  outsideMenuListener() {
-    //NOT WORKING
-    if (
-      MenusManager.menus.length > 0 &&
-      MenusManager.menus[MenusManager.menus.length - 1].allowClickOut
-    ) {
-      this.will_close_on_up = true;
-    } else {
-      this.will_close_on_up = false;
-    }
-  }
-  outsideMenuListenerUp() {
-    //NOT WORKING
-    if (
-      MenusManager.menus.length > 0 &&
-      MenusManager.menus[MenusManager.menus.length - 1].allowClickOut
-    ) {
-      if (this.will_close_on_up) {
-        MenusManager.closeMenu();
-      }
-    } else {
-      this.will_close_on_up = false;
-    }
-  }
-  UNSAFE_componentWillMount() {
-    if (!document.getElementById('context-menu-layer')) {
-      const div = document.createElement('div');
-      div.setAttribute('id', 'context-menu-layer');
-      document.body.appendChild(div);
-    }
-  }
-  componentWillUnmount() {
-    MenusManager.removeListener(this);
-    document.removeEventListener('mousedown', this.outsideClickListener);
-    document.removeEventListener('mouseup', this.outsideClickListenerUp);
+  return el;
+}
 
-    Object.keys(this.menu_observer).forEach(index => {
-      this.menu_observer[index].disconnect();
-    });
-  }
-  componentDidMount() {
-    var element = this.menus_dom;
-    this.outsideClickListener = event => {
-      if (!element.contains(event.target) && document.contains(event.target)) {
-        this.outsideMenuListener();
+export default function MenusBodyLayer() {
+  const [, forceRender] = useState(0);
+  const menusDomRef = useRef(null);
+  const menuObserverRef = useRef({});
+  const lastUpdatePositionRef = useRef({});
+  const indexUpdatePositionRef = useRef({});
+  const willCloseOnUpRef = useRef(false);
+  const portalRoot = useMemo(() => getOrCreatePortalRoot(), []);
+
+  // Subscribe to MenusManager changes
+  useEffect(() => {
+    const listener = () => {
+      forceRender(n => n + 1);
+    };
+    MenusManager.addListener(listener);
+    return () => {
+      MenusManager.removeListener(listener);
+    };
+  }, []);
+
+  // Outside click detection via document listeners
+  useEffect(() => {
+    const element = menusDomRef.current;
+
+    const outsideClickListener = (event) => {
+      if (element && !element.contains(event.target) && document.contains(event.target)) {
+        //NOT WORKING
+        if (
+          MenusManager.menus.length > 0 &&
+          MenusManager.menus[MenusManager.menus.length - 1].allowClickOut
+        ) {
+          willCloseOnUpRef.current = true;
+        } else {
+          willCloseOnUpRef.current = false;
+        }
       }
     };
-    this.outsideClickListenerUp = event => {
-      if (!element.contains(event.target) && document.contains(event.target)) {
-        this.outsideMenuListenerUp();
+
+    const outsideClickListenerUp = (event) => {
+      if (element && !element.contains(event.target) && document.contains(event.target)) {
+        //NOT WORKING
+        if (
+          MenusManager.menus.length > 0 &&
+          MenusManager.menus[MenusManager.menus.length - 1].allowClickOut
+        ) {
+          if (willCloseOnUpRef.current) {
+            MenusManager.closeMenu();
+          }
+        } else {
+          willCloseOnUpRef.current = false;
+        }
       }
     };
-    document.addEventListener('mousedown', this.outsideClickListener);
-    document.addEventListener('mouseup', this.outsideClickListenerUp);
-  }
-  fixMenuPosition(node, item, index) {
+
+    document.addEventListener('mousedown', outsideClickListener);
+    document.addEventListener('mouseup', outsideClickListenerUp);
+
+    return () => {
+      document.removeEventListener('mousedown', outsideClickListener);
+      document.removeEventListener('mouseup', outsideClickListenerUp);
+      Object.keys(menuObserverRef.current).forEach(index => {
+        menuObserverRef.current[index].disconnect();
+      });
+    };
+  }, []);
+
+  const fixMenuPosition = useCallback((node, item, index) => {
     if (!node) {
       return;
     }
 
-    if (this.lastUpdatePosition[item.id] !== parseInt(new Date().getTime() / 1000)) {
-      this.lastUpdatePosition[item.id] = parseInt(new Date().getTime() / 1000);
-      this.indexUpdatePosition[item.id] = 0;
-    } else if (this.indexUpdatePosition[item.id] > 2) {
+    if (lastUpdatePositionRef.current[item.id] !== parseInt(new Date().getTime() / 1000)) {
+      lastUpdatePositionRef.current[item.id] = parseInt(new Date().getTime() / 1000);
+      indexUpdatePositionRef.current[item.id] = 0;
+    } else if (indexUpdatePositionRef.current[item.id] > 2) {
       return;
     }
-    this.indexUpdatePosition[item.id]++;
+    indexUpdatePositionRef.current[item.id]++;
 
-    if (this.menu_observer[index]) {
-      this.menu_observer[index].disconnect();
+    if (menuObserverRef.current[index]) {
+      menuObserverRef.current[index].disconnect();
     }
 
     var config = { childList: true, subtree: true };
-    this.menu_observer[index] = new MutationObserver(() => {
-      this.fixMenuPosition(node, item);
+    menuObserverRef.current[index] = new MutationObserver(() => {
+      fixMenuPosition(node, item);
     });
-    this.menu_observer[index].observe(node, config);
+    menuObserverRef.current[index].observe(node, config);
 
-    var nr = window.getBoundingClientRect(node);
+    var nr = node.getBoundingClientRect();
     nr.x = nr.x || nr.left;
     nr.y = nr.y || nr.top;
     var rect = JSON.parse(JSON.stringify(nr || {}));
@@ -153,96 +160,83 @@ export default class MenusBodyLayer extends React.Component {
       );
       MenusManager.notify();
     }
-  }
-  shouldComponentUpdate(nextProps, nextState) {
-    if (nextState.menus_manager.willClose !== this.willClose) {
-      this.willClose = nextState.menus_manager.willClose;
-      return true;
-    }
-    if (this.state.menus_manager.menus.length > 0 || this.last_menu_length > 0) {
-      this.last_menu_length = this.state.menus_manager.menus.length;
-      return true;
-    }
-    return false;
-  }
-  render() {
-    return ReactDOM.createPortal(
-      <OutsideClickHandler
-        onOutsideClick={() => {
-          MenusManager.closeMenu();
-        }}
-      >
-        <div ref={node => (this.menus_dom = node)}>
-          {this.state.menus_manager.menus.map((item, i) => {
-            var menu = (
-              <OutsideClickHandler
-                key={item.id}
-                onOutsideClick={() => {
-                  if (i === this.state.menus_manager.menus.length - 1) {
-                    MenusManager.closeSubMenu(item.level - 1);
-                  }
-                }}
-              >
-                <div
-                  ref={node => this.fixMenuPosition(node, item, i)}
-                  style={{
-                    zIndex: 1050,
-                    position: 'absolute',
-                    transform: item.positionType === 'bottom' ? '' : 'translateY(-50%)',
-                    left: item.position.x - 140,
-                    top: item.position.y + 2,
-                    marginTop: item.position.marginTop,
-                    marginLeft: item.position.marginLeft,
-                  }}
-                >
-                  {item.enableMobileMenu ? (
-                    <MobileMenu
-                      withFrame
-                      menu={item.menu}
-                      openAt={item.openAt}
-                      level={item.level}
-                      animationClass={
-                        this.state.menus_manager.willClose || item.willClose
-                          ? 'fade_out'
-                          : item.level === 0 || item.positionType
-                          ? item.positionType === 'bottom'
-                            ? 'skew_in_bottom_nobounce'
-                            : item.left
-                            ? 'skew_in_left_nobounce'
-                            : 'skew_in_right_nobounce'
-                          : 'fade_in'
-                      }
-                      testClassId={item.menuTestClassId}
-                    />
-                  ) : (
-                    <MenuComponent
-                      withFrame
-                      menu={item.menu}
-                      openAt={item.openAt}
-                      level={item.level}
-                      animationClass={
-                        this.state.menus_manager.willClose || item.willClose
-                          ? 'fade_out'
-                          : item.level === 0 || item.positionType
-                          ? item.positionType === 'bottom'
-                            ? 'skew_in_bottom_nobounce'
-                            : item.left
-                            ? 'skew_in_left_nobounce'
-                            : 'skew_in_right_nobounce'
-                          : 'fade_in'
-                      }
-                      testClassId={item.menuTestClassId}
-                    />
-                  )}
-                </div>
-              </OutsideClickHandler>
-            );
+  }, []);
 
-            return menu;
-          })}
-        </div>
-      </OutsideClickHandler>,
-      document.getElementById('context-menu-layer'),
-    );
-  }
+  const menus = MenusManager.menus;
+  const willClose = MenusManager.willClose;
+
+  return createPortal(
+    <OutsideClickHandler
+      onOutsideClick={() => {
+        MenusManager.closeMenu();
+      }}
+    >
+      <div ref={menusDomRef}>
+        {menus.map((item, i) => (
+          <OutsideClickHandler
+            key={item.id}
+            onOutsideClick={() => {
+              if (i === menus.length - 1) {
+                MenusManager.closeSubMenu(item.level - 1);
+              }
+            }}
+          >
+            <div
+              ref={node => fixMenuPosition(node, item, i)}
+              style={{
+                zIndex: 1050,
+                position: 'absolute',
+                transform: item.positionType === 'bottom' ? '' : 'translateY(-50%)',
+                left: item.position.x - 140,
+                top: item.position.y + 2,
+                marginTop: item.position.marginTop,
+                marginLeft: item.position.marginLeft,
+              }}
+            >
+              {item.enableMobileMenu ? (
+                <MobileMenu
+                  withFrame
+                  menu={item.menu}
+                  openAt={item.openAt}
+                  level={item.level}
+                  animationClass={
+                    willClose || item.willClose
+                      ? 'fade_out'
+                      : item.level === 0 || item.positionType
+                      ? item.positionType === 'bottom'
+                        ? 'skew_in_bottom_nobounce'
+                        : item.left
+                        ? 'skew_in_left_nobounce'
+                        : 'skew_in_right_nobounce'
+                      : 'fade_in'
+                  }
+                  testClassId={item.menuTestClassId}
+                />
+              ) : (
+                <MenuComponent
+                  withFrame
+                  menu={item.menu}
+                  openAt={item.openAt}
+                  level={item.level}
+                  animationClass={
+                    willClose || item.willClose
+                      ? 'fade_out'
+                      : item.level === 0 || item.positionType
+                      ? item.positionType === 'bottom'
+                        ? 'skew_in_bottom_nobounce'
+                        : item.left
+                        ? 'skew_in_left_nobounce'
+                        : 'skew_in_right_nobounce'
+                      : 'fade_in'
+                  }
+                  testClassId={item.menuTestClassId}
+                />
+              )}
+            </div>
+          </OutsideClickHandler>
+        ))}
+      </div>
+    </OutsideClickHandler>,
+    portalRoot,
+  );
 }

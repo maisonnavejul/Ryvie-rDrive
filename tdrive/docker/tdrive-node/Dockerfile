@@ -1,7 +1,7 @@
 # Common node machine
 FROM node:lts-alpine AS node-base
 
-### Install dependencies
+### Install system dependencies
 RUN apk add --update-cache \
       ghostscript \
       graphicsmagick \
@@ -9,43 +9,42 @@ RUN apk add --update-cache \
       openldap-clients \
     && rm -rf /var/cache/apk/*
 
-
-### Install TDrive
 WORKDIR /usr/src/app
+
+# ---- Dependencies layer (cached unless package*.json changes) ----
+FROM node-base AS deps
+
 COPY backend/node/package*.json ./
-
-# Test Stage
-FROM node-base AS test
-
-RUN npm install --legacy-peer-deps
-COPY backend/node/ .
-
-# Add frontend Stage
-FROM node-base AS installed-libs
-
-COPY backend/node/ .
-#Install dev dependancies for build
-ENV NODE_ENV=development
 RUN npm ci --legacy-peer-deps
 
-#Build in production mode
-ENV NODE_ENV=production
+# ---- Build stage ----
+FROM deps AS build
+
+COPY backend/node/ .
 RUN npm run build
-RUN rm -rf node_modules
-#Install prod dependancies after build
-RUN npm ci --legacy-peer-deps
 
-# Development Stage
-FROM installed-libs AS development
+# ---- Test Stage ----
+FROM deps AS test
 
-ENV NODE_ENV=development
-RUN npm install -g pino-pretty && \
-    npm install -g tsc-watch && \
-    npm ci --legacy-peer-deps
-CMD ["npm", "run", "dev:debug"]
+COPY backend/node/ .
 
-# Production Stage
-FROM installed-libs AS production
+# ---- Production stage (slim) ----
+FROM node-base AS production
+
+COPY --from=build /usr/src/app/dist ./dist
+COPY --from=build /usr/src/app/config ./config
+COPY --from=deps /usr/src/app/node_modules ./node_modules
+COPY backend/node/package*.json ./
+COPY backend/node/bin ./bin
 
 EXPOSE 4000
 CMD ["npm", "run", "serve"]
+
+# ---- Development Stage ----
+FROM deps AS development
+
+RUN npm install -g pino-pretty tsc-watch
+COPY backend/node/ .
+
+ENV NODE_ENV=development
+CMD ["npm", "run", "dev:debug"]

@@ -1,7 +1,7 @@
 import { Transition } from '@headlessui/react';
 import { ChevronLeftIcon, ChevronRightIcon, XIcon } from '@heroicons/react/outline';
 import { useEffect, useState } from 'react';
-import { fadeTransition, fadeZoomTransition } from 'src/utils/transitions';
+import { fadeTransition, fadeZoomTransition } from '../../../../utils/transitions';
 import Controls from './controls';
 import Display from './display';
 import Avatar from '@atoms/avatar';

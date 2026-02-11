@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "concurrently \"npm run watch-compile\" \"npm run watch-dev\"",
     "watch-compile": "swc src -w --out-dir dist --source-maps --copy-files",
-    "watch-dev": "nodemon --watch \"dist/**/*\" -e js ./dist/server.js",
-    "start": "cross-env NODE_ENV=production node dist/server.js",
+    "watch-dev": "nodemon --watch \"dist/**/*\" -e js ./dist/src/server.js",
+    "start": "cross-env NODE_ENV=production node dist/src/server.js",
     "build": "swc src -d dist --source-maps --copy-files",
     "build:tsc": "tsc && tsc-alias",
     "lint": "eslint --ignore-path .gitignore --ext .ts src/",
@@ -32,7 +32,7 @@
     "tslog": "^3.3.4"
   },
   "devDependencies": {
-    "@swc/cli": "^0.1.57",
+    "@swc/cli": "^0.8.0",
     "@swc/core": "^1.2.220",
     "@types/cors": "^2.8.12",
     "@types/express": "^4.17.14",

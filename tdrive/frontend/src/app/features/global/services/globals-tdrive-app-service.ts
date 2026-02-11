@@ -6,7 +6,7 @@ import LocalStorage from '../framework/local-storage-service';
 import { EnvironmentType, EnvironmentVersionType } from '@environment/types';
 import ServiceRegistry from '../framework/registry-service';
 
-if (process.env.NODE_ENV === 'production' && (window as any).sentry_dsn) {
+if (import.meta.env.MODE === 'production' && (window as any).sentry_dsn) {
   Sentry.init({
     dsn: (window as any).sentry_dsn,
   });
