@@ -1,6 +1,6 @@
 import { Title } from '@atoms/text';
 import { DriveItem } from '@features/drive/types';
-import { ChevronDownIcon, ChevronLeftIcon } from '@heroicons/react/solid';
+import { ChevronDownIcon, ChevronLeftIcon } from '@heroicons/react/24/solid';
 import { useEffect, useState } from 'react';
 import { PublicIcon } from './components/public-icon';
 import MenusManager from '@components/menus/menus-manager.jsx';

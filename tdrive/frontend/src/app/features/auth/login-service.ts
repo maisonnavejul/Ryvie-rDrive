@@ -99,6 +99,12 @@ class Login extends Observable {
       }
 
       await this.updateUser((err, user) => this.logger.debug('User is updated', err, user));
+    } else if (this.currentUserId) {
+      // Auth already initialized and user was fetched previously, but
+      // recoilUpdateUser may not have been assigned yet (React 18 createRoot
+      // defers effects, so the Client component mounts after the initial auth
+      // flow completes). Re-call updateUser to push the user into Recoil state.
+      await this.updateUser((err, user) => this.logger.debug('User re-synced to Recoil', err, user));
     }
   }
 
@@ -119,40 +125,44 @@ class Login extends Observable {
       return;
     }
 
-    AuthService.updateUser(async user => {
-      this.logger.debug('User update result', user);
-      if (!user) {
-        if (!(await this.pingServer())) {
-          //We are disconnected
-          console.log('We are disconnected, we will get user again in 10 seconds');
-          setTimeout(() => {
-            this.updateUser(callback);
-          }, 10000);
-          return;
+    return new Promise<void>((resolve) => {
+      AuthService.updateUser(async user => {
+        this.logger.debug('User update result', user);
+        if (!user) {
+          if (!(await this.pingServer())) {
+            //We are disconnected
+            console.log('We are disconnected, we will get user again in 10 seconds');
+            setTimeout(() => {
+              this.updateUser(callback);
+            }, 10000);
+            resolve();
+            return;
+          } else {
+            console.log('Unable to fetch user even if server is up');
+            this.firstInit = true;
+            this.state = 'logged_out';
+            this.notify();
+
+            WindowState.setPrefix();
+            WindowState.setSuffix();
+            RouterServices.push(
+              RouterServices.addRedirection(
+                `${RouterServices.pathnames.LOGIN}${RouterServices.history.location.search}`,
+              ),
+            );
+          }
         } else {
-          console.log('Unable to fetch user even if server is up');
-          this.firstInit = true;
-          this.state = 'logged_out';
+          this.setCurrentUser(user);
+          await Application.start(user);
+          this.state = 'app';
           this.notify();
-
-          WindowState.setPrefix();
-          WindowState.setSuffix();
-          RouterServices.push(
-            RouterServices.addRedirection(
-              `${RouterServices.pathnames.LOGIN}${RouterServices.history.location.search}`,
-            ),
-          );
+          RouterServices.push(RouterServices.generateRouteFromState());
         }
-      } else {
-        this.setCurrentUser(user);
-        await Application.start(user);
-        this.state = 'app';
-        this.notify();
-        RouterServices.push(RouterServices.generateRouteFromState());
-      }
 
-      this.recoilUpdateUser(user);
-      callback && callback(null, user);
+        this.recoilUpdateUser(user);
+        callback && callback(null, user);
+        resolve();
+      });
     });
   }
 

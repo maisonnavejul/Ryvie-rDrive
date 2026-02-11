@@ -1,4 +1,4 @@
-import { PlusIcon, TruckIcon, UploadIcon } from '@heroicons/react/outline';
+import { PlusIcon, TruckIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 import { useCallback, useRef } from 'react';
 import { useRecoilState, useSetRecoilState } from 'recoil';
 import { AnimatedHeight } from '../../../atoms/animated-height';
@@ -16,7 +16,7 @@ import Languages from "features/global/services/languages-service";
 import { useCurrentUser } from 'app/features/users/hooks/use-current-user';
 import useRouteState from 'app/features/router/hooks/use-route-state';
 import { useHistory } from 'react-router-dom';
-import { TrashIcon } from '@heroicons/react/outline';
+import { TrashIcon } from '@heroicons/react/24/outline';
 
 export const CreateModalWithUploadZones = ({ initialParentId }: { initialParentId?: string }) => {
   const companyId = useRouterCompany();
@@ -182,7 +182,7 @@ export default () => {
             style={{ boxShadow: '0 0 10px 0 rgba(0, 122, 255, 0.5)' }}
             testClassId="button-upload"
           >
-            <UploadIcon className="w-5 h-5 mr-2" /> {Languages.t('components.side_menu.buttons.upload')}
+            <ArrowUpTrayIcon className="w-5 h-5 mr-2" /> {Languages.t('components.side_menu.buttons.upload')}
           </Button>
           {!shouldHideCreateButton && (
             <Button

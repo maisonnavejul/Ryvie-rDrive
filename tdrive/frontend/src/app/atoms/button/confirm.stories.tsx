@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
-import { ComponentStory } from '@storybook/react';
+import { StoryFn } from '@storybook/react';
 import { ButtonConfirm } from './confirm';
 import { RecoilRoot } from 'recoil';
 
@@ -8,7 +8,7 @@ export default {
   title: '@atoms/button-confirm',
 };
 
-const Template: ComponentStory<any> = (props: {
+const Template: StoryFn<any> = (props: {
   text: string;
   disabled: boolean;
   loading: boolean;

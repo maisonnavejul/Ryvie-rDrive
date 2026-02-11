@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Shortcuts } from 'shortcuts';
+import Shortcuts from 'shortcuts';
 
 const shortcuts = new Shortcuts({
   target: document,

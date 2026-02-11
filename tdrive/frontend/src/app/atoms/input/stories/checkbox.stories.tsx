@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ComponentStory } from '@storybook/react';
+import { StoryFn } from '@storybook/react';
 import { useState } from 'react';
 import { Checkbox } from '../input-checkbox';
 import { CheckboxSlider } from '../input-checkbox-slider';
@@ -9,7 +9,7 @@ export default {
   title: '@atoms/checkbox',
 };
 
-const Template: ComponentStory<any> = (props: { label: string; disabled: boolean }) => {
+const Template: StoryFn<any> = (props: { label: string; disabled: boolean }) => {
   const [checked, setChecked] = useState(false);
 
   return (

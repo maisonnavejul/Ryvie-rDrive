@@ -89,7 +89,7 @@ services:
 
   onlyoffice-connector:
     container_name: app-rdrive-onlyoffice-connector
-    image: julescloud/rdrive-onlyoffice-connector:v0.0.3
+    image: julescloud/rdrive-onlyoffice-connector:v0.0.4
     environment:
       - SERVER_PORT=5000
       - SERVER_PREFIX=/plugins/onlyoffice/
@@ -127,7 +127,7 @@ services:
 
   node_create_user:
     container_name: app-rdrive-node-create-user
-    image: julescloud/rdrive-node-create-user:v0.0.4
+    image: julescloud/rdrive-node-create-user:v0.0.5
     env_file:
       - .env
     environment: &backend_env_vars
@@ -151,6 +151,7 @@ services:
     command: node dist/bin/sync_ldap_users.js
     volumes: &backend_volumes
       - ./backend/node/profiles:/usr/src/app/profiles
+      - ./backend/node/config:/usr/src/app/config
       - ./backend/node/src:/usr/src/app/src
       - ./docker-data/files:/tdrive/docker-data/files
       - /usr/bin/rclone:/usr/bin/rclone:ro
@@ -167,13 +168,16 @@ services:
   node:
     container_name: app-rdrive-node
     restart: unless-stopped
-    image: julescloud/rdrive-node:v0.0.7
+    image: julescloud/rdrive-node:v0.0.8
     env_file:
       - .env
     ports:
       - 4000:4000
       - 9229:9229
     environment: *backend_env_vars
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "ryvie.local:host-gateway"
     healthcheck:
       test: curl --fail 'http://localhost:4000/diagnostics/t/ready?secret=diag-secret'
       interval: 10s
@@ -188,14 +192,16 @@ services:
     networks:
       - tdrive_default
       - ldap_my_custom_network
+      - ryvie-network
 
   frontend:
-    image: julescloud/rdrive-frontend:v0.0.6
+    image: julescloud/rdrive-frontend:v0.0.7
     container_name: app-rdrive-frontend
     environment:
       - DEV=production
       - SSL_CERTS=off
       - NODE_HOST=http://node:4000
+      - ONLYOFFICE_CONNECTOR_HOST=http://host.docker.internal:5000
       - REACT_APP_FRONTEND_URL=${REACT_APP_FRONTEND_URL}
       - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL}
       - REACT_APP_WEBSOCKET_URL=${REACT_APP_WEBSOCKET_URL}
@@ -205,6 +211,8 @@ services:
     ports:
       - 3010:80
       - 8443:443
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     depends_on:
       node:
@@ -225,4 +233,6 @@ networks:
   tdrive_network:
     driver: bridge
   ldap_my_custom_network:
+    external: true
+  ryvie-network:
     external: true

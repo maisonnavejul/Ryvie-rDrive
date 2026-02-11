@@ -10,7 +10,7 @@ import LoginService from '@features/auth/login-service';
 import InitService from '@features/global/services/init-service';
 import Languages from '@features/global/services/languages-service';
 import userService from '@features/users/services/current-user-service';
-import { ExternalLinkIcon } from '@heroicons/react/outline';
+import { ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import ButtonWithTimeout from 'components/buttons/button-with-timeout.jsx';
 import Input from 'components/inputs/input.jsx';
 import MenuList from 'components/menus/menu-component.jsx';

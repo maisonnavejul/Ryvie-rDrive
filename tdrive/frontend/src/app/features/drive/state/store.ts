@@ -28,7 +28,7 @@ export const DriveItemPagination = atom<BrowsePaginate>({
   key: 'DriveItemPagination',
   default: {
     page: 0,
-    limit: 15,
+    limit: 50,
     lastPage: false,
   },
 });

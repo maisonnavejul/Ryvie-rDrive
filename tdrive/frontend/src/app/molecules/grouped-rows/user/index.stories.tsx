@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ComponentStory } from '@storybook/react';
+import { StoryFn } from '@storybook/react';
 
 import UserBlock from '.';
 import { CheckIcon } from '@atoms/icons-agnostic';
@@ -15,7 +15,7 @@ const mockUser = (first_name: string, last_name: string, email: string, thumbnai
     first_name, last_name, email, thumbnail,
   } as UserType);
 
-const Template: ComponentStory<any> = (props: {
+const Template: StoryFn<any> = (props: {
   first_name: string;
   last_name: string;
   email: string;

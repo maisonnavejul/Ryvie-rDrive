@@ -1,4 +1,4 @@
-import { TdriveService, ServiceName, logger as rootLogger } from "../../framework";
+import { TdriveService, ServiceName, logger as rootLogger, TdriveLogger } from "../../framework";
 import {
   MessageQueueAdapter,
   MessageQueueListener,
@@ -14,7 +14,7 @@ import config from "../../../../core/config";
 
 const logger = rootLogger.child({
   component: "tdrive.core.platform.services.message-queue",
-});
+}) as TdriveLogger;
 @ServiceName("message-queue")
 export default class MessageQueue extends TdriveService<MessageQueueServiceAPI> {
   version = "1";

@@ -17,7 +17,7 @@ function mountAssetsRoutes(router: Router) {
       res.header('Access-Control-Allow-Headers', 'X-Requested-With');
       next();
     },
-    expressStatic(path.join(__dirname, '../../assets')),
+    expressStatic(path.join(__dirname, '../../../assets')),
   );
 }
 

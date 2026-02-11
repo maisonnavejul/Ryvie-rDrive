@@ -24,20 +24,30 @@ export function buildSearchQuery<Entity>(
   if (options.$text) {
     const prefixMapping = entityDefinition?.options?.search?.mongoMapping?.prefix || {};
     const textMapping = entityDefinition?.options?.search?.mongoMapping?.text || {};
-    //Try to detect when we need prefix search
-    if (Object.values(prefixMapping).length > 0 && options.$text.$search.indexOf(" ") < 0) {
-      query.$or = [...Object.keys(prefixMapping), ...Object.keys(textMapping)].map(k => {
-        if (prefixMapping[k] === "prefix") {
-          return {
-            [k]: new RegExp(`^${asciiFold(options.$text.$search || "")}`, "i"),
-          };
-        } else {
-          return {
-            [k]: new RegExp(`${asciiFold(options.$text.$search || "")}`, "i"),
-          };
-        }
-      });
+    const allFields = [...new Set([...Object.keys(prefixMapping), ...Object.keys(textMapping)])];
+
+    if (Object.values(prefixMapping).length > 0) {
+      // Use regex-based search for partial/substring matching
+      const searchTerms = asciiFold(options.$text.$search || "")
+        .split(/\s+/)
+        .filter(t => t.length > 0);
+
+      if (searchTerms.length === 1) {
+        // Single word: match any field containing the term
+        const term = searchTerms[0];
+        query.$or = allFields.map(k => ({
+          [k]: new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"),
+        }));
+      } else if (searchTerms.length > 1) {
+        // Multi-word: each term must match at least one field (AND between terms)
+        query.$and = searchTerms.map(term => ({
+          $or: allFields.map(k => ({
+            [k]: new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"),
+          })),
+        }));
+      }
     } else {
+      // Fallback to MongoDB $text search when no prefix mapping
       project = { score: { $meta: "textScore" } };
       sort = { score: -1 };
       if (options?.$text?.$search)

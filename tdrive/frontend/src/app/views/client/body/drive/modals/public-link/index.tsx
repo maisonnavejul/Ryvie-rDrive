@@ -9,7 +9,7 @@ import type { DriveFileAccessLevel } from '@features/drive/types';
 
 import A from '@atoms/link';
 import { Subtitle } from '@atoms/text';
-import { LockClosedIcon, EyeIcon, PencilIcon, ScaleIcon, EyeOffIcon } from '@heroicons/react/outline';
+import { LockClosedIcon, EyeIcon, PencilIcon, ScaleIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { Modal, ModalContent } from '@atoms/modal';
 import { PublicLinkAccessOptions } from './public-link-access-options';
 import BaseBlock from '@molecules/grouped-rows/base';
@@ -62,7 +62,7 @@ const ChangePublicLinkAccessLevelRow = (props: {
     'manage': ScaleIcon,
     'write': PencilIcon,
     'read': EyeIcon,
-    'none': EyeOffIcon,
+    'none': EyeSlashIcon,
   }[props.level || 'none'];
   return (
     <BaseBlock

@@ -1,11 +1,11 @@
 import { MessageQueueAdapter, MessageQueueType } from "./api";
 import { AMQPMessageQueueService } from "./amqp";
 import { LocalMessageQueueService } from "./local";
-import { TdriveServiceConfiguration, logger as rootLogger } from "../../framework";
+import { TdriveServiceConfiguration, logger as rootLogger, TdriveLogger } from "../../framework";
 
 const logger = rootLogger.child({
   component: "tdrive.core.platform.services.message-queue.factory",
-});
+}) as TdriveLogger;
 
 const DEFAULT_AMQP_URL = "amqp://guest:guest@localhost:5672";
 const DEFAULT_ADAPTER = "amqp";

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Dialog, Transition } from '@headlessui/react';
+import { Dialog, DialogPanel, Transition, TransitionChild } from '@headlessui/react';
 import { Fragment, ReactNode, useCallback, useEffect, useState } from 'react';
 import { atom, useRecoilState } from 'recoil';
 import { DismissIcon } from '../icons-colored';
@@ -60,13 +60,13 @@ export const Modal = (props: {
   const zIndex = 'z-' + level + '0';
 
   return (
-    <Transition.Root show={open} as={Fragment}>
+    <Transition show={open} as={Fragment}>
       <Dialog
         as="div"
         className={'relative ' + zIndex}
         onClose={() => props.onClose && props.closable && props.onClose()}
       >
-        <Transition.Child
+        <TransitionChild
           as={Fragment}
           enter="ease-out duration-300"
           enterFrom="opacity-0 pointer-events-none"
@@ -81,7 +81,7 @@ export const Modal = (props: {
               (level === 1 ? 'bg-black' : 'bg-transparent')
             }
           />
-        </Transition.Child>
+        </TransitionChild>
 
         <div
           className={
@@ -109,7 +109,7 @@ export const Modal = (props: {
                 </span>
               )
             }
-            <Transition.Child
+            <TransitionChild
               as={Fragment}
               enter="ease-out duration-300"
               enterFrom="opacity-0 pointer-events-none translate-y-4 sm:translate-y-0 sm:scale-95"
@@ -118,7 +118,7 @@ export const Modal = (props: {
               leaveFrom="opacity-100 translate-y-0 sm:scale-100"
               leaveTo="opacity-0 pointer-events-none translate-y-4 sm:translate-y-0 sm:scale-95"
             >
-              <Dialog.Panel
+              <DialogPanel
                 className={
                   'relative inline-block align-bottom bg-white dark:bg-zinc-900 rounded-tr-xl rounded-tl-xl sm:rounded-md px-4 pt-5 pb-4 text-left w-full overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-xl sm:w-full sm:p-4 ' +
                   (props.className || '')
@@ -139,12 +139,12 @@ export const Modal = (props: {
                   </div>
                 )}
                 {didOpenOnce && props.children}
-              </Dialog.Panel>
-            </Transition.Child>
+              </DialogPanel>
+            </TransitionChild>
           </div>
         </div>
       </Dialog>
-    </Transition.Root>
+    </Transition>
   );
 };
 export type ModalContentTheme = 'success' | 'danger' | 'warning' | 'gray';

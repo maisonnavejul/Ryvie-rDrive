@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ComponentStory } from '@storybook/react';
-import { SearchIcon } from '@heroicons/react/solid';
+import { StoryFn } from '@storybook/react';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/solid';
 import { Title } from '@atoms/text';
 import { Input } from '../input-text';
-import { FilterIcon, CogIcon } from '@heroicons/react/outline';
+import { FunnelIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 import Select from '../input-select';
 import { InputDecorationIcon } from '../input-decoration-icon';
 
@@ -11,34 +11,34 @@ export default {
   title: '@atoms/input-groups',
 };
 
-const Template: ComponentStory<any> = () => {
+const Template: StoryFn<any> = () => {
   return (
     <>
       <Title>Icons</Title>
       <br />
 
       <InputDecorationIcon
-        prefix={SearchIcon}
+        prefix={MagnifyingGlassIcon}
         input={({ className }) => <Input className={className} placeholder="Awesome text" />}
       />
       <br />
 
       <InputDecorationIcon
-        suffix={FilterIcon}
+        suffix={FunnelIcon}
         input={({ className }) => <Input className={className} placeholder="Awesome text" />}
       />
       <br />
 
       <InputDecorationIcon
-        prefix={SearchIcon}
-        suffix={FilterIcon}
+        prefix={MagnifyingGlassIcon}
+        suffix={FunnelIcon}
         input={({ className }) => <Input className={className} placeholder="Awesome text" />}
       />
       <br />
 
       <InputDecorationIcon
-        prefix={SearchIcon}
-        suffix={FilterIcon}
+        prefix={MagnifyingGlassIcon}
+        suffix={FunnelIcon}
         input={({ className }) => (
           <Input className={className} multiline placeholder="Awesome text" />
         )}
@@ -46,7 +46,7 @@ const Template: ComponentStory<any> = () => {
       <br />
 
       <InputDecorationIcon
-        prefix={SearchIcon}
+        prefix={MagnifyingGlassIcon}
         input={({ className }) => (
           <Select className={className}>
             <option>Option 1</option>
@@ -74,8 +74,8 @@ const Template: ComponentStory<any> = () => {
       <div className="relative flex">
         <InputDecorationIcon
           className="grow mr-px"
-          prefix={SearchIcon}
-          suffix={CogIcon}
+          prefix={MagnifyingGlassIcon}
+          suffix={Cog6ToothIcon}
           input={({ className }) => (
             <Input
               className={className + ' rounded-tr-none rounded-br-none'}
@@ -85,7 +85,7 @@ const Template: ComponentStory<any> = () => {
         />
         <InputDecorationIcon
           className=""
-          prefix={FilterIcon}
+          prefix={FunnelIcon}
           input={({ className }) => (
             <Select
               className={className + 'pl-9 w-auto rounded-tl-none rounded-bl-none text-opacity-50'}

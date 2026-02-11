@@ -4,9 +4,9 @@ import { Base } from '@atoms/text';
 import { Transition } from '@headlessui/react';
 import {
   ChevronLeftIcon,
-  DocumentDownloadIcon,
-  FolderDownloadIcon,
-} from '@heroicons/react/outline';
+  DocumentArrowDownIcon,
+  FolderArrowDownIcon,
+} from '@heroicons/react/24/outline';
 import { ReactNode } from 'react';
 import { atom, useRecoilState } from 'recoil';
 import { slideXTransition, slideXTransitionReverted } from 'src/utils/transitions';
@@ -72,13 +72,13 @@ export const UploadModal = ({
           >
             <div className="-m-2" >
               <CreateModalOption
-                icon={<DocumentDownloadIcon className="w-5 h-5" />}
+                icon={<DocumentArrowDownIcon className="w-5 h-5" />}
                 text={Languages.t('components.create_modal.upload_files')}
                 onClick={() => selectFromDevice()}
                 testClassId="upload-file-from-device"
               />
               <CreateModalOption
-                icon={<FolderDownloadIcon className="w-5 h-5" />}
+                icon={<FolderArrowDownIcon className="w-5 h-5" />}
                 text={Languages.t('components.create_modal.upload_folders')}
                 onClick={() => selectFolderFromDevice()}
                 testClassId="upload-folder-from-device"

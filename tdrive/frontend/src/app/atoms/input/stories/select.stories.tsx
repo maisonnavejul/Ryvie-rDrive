@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ComponentStory } from '@storybook/react';
+import { StoryFn } from '@storybook/react';
 import { Title } from '@atoms/text';
 import { InputLabel } from '../input-decoration-label';
 import Select from '../input-select';
@@ -8,7 +8,7 @@ export default {
   title: '@atoms/select',
 };
 
-const Template: ComponentStory<any> = (props: {
+const Template: StoryFn<any> = (props: {
   text: string;
   disabled: boolean;
   loading: boolean;
