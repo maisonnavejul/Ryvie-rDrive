@@ -50,6 +50,13 @@ export function useCompanyApplications(companyId = '') {
     [workspaceId],
   );
 
+  // If applications are still empty after the global effect has already run, force a refresh
+  useEffect(() => {
+    if (companyId && applications.length === 0 && !loading) {
+      refresh();
+    }
+  }, [companyId]);
+
   const get = (applicationId: string): Application | null => {
     return applications.find(a => a.id === applicationId) || null;
   };

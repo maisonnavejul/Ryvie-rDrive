@@ -25,15 +25,29 @@ const FileTypeIcons: { [key: string]: (props: ComponentProps<'svg'>) => JSX.Elem
   link: FileTypeLinkIcon,
 };
 
+const extensionToFileType: { [key: string]: string } = {
+  doc: 'document', docx: 'document', odt: 'document', rtf: 'document', txt: 'document',
+  xls: 'spreadsheet', xlsx: 'spreadsheet', ods: 'spreadsheet', csv: 'spreadsheet',
+  ppt: 'slides', pptx: 'slides', odp: 'slides',
+  pdf: 'pdf',
+  zip: 'archive', rar: 'archive', tar: 'archive', gz: 'archive', '7z': 'archive',
+  png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', bmp: 'image', svg: 'image', webp: 'image',
+  mp4: 'video', avi: 'video', mov: 'video', mkv: 'video', webm: 'video',
+  mp3: 'audio', wav: 'audio', ogg: 'audio', flac: 'audio',
+};
+
 export const DocumentIcon = (props: {
   item?: DriveItem;
   className?: string;
   fileType?: string;
   blueiffyFolders?: boolean;
 }) => {
-  const fileType = props.fileType || fileUploadApiClient.mimeToType(
+  let fileType = props.fileType || fileUploadApiClient.mimeToType(
     props.item?.last_version_cache?.file_metadata?.mime || '',
   );
+  if (fileType === 'other' && props.item?.extension) {
+    fileType = extensionToFileType[props.item.extension.toLowerCase()] || fileType;
+  }
   const metadata = (props.item?.last_version_cache?.file_metadata || {}) as FileMetadata;
   const className = props.className || 'h-5 w-5 shrink-0 text-gray-400';
   const SpecificFileTypeIcon = FileTypeIcons[fileType] || FileTypeUnknownIcon;

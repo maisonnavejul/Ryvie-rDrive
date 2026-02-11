@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
-import { ComponentStory } from '@storybook/react';
+import { StoryFn } from '@storybook/react';
 
 import WorkspaceBlock from '.';
 import Avatar from '@atoms/avatar';
@@ -10,7 +10,7 @@ export default {
   title: '@molecules/grouped-rows',
 };
 
-const Template: ComponentStory<any> = (props: {
+const Template: StoryFn<any> = (props: {
   title: string;
   subtitle: string;
   checked: boolean;

@@ -1,16 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
-import { ComponentStory } from '@storybook/react';
+import { StoryFn } from '@storybook/react';
 import { Button } from './button';
-import { PlusIcon, SearchIcon } from '@heroicons/react/solid';
-import { TrashIcon } from '@heroicons/react/outline';
+import { PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/solid';
+import { TrashIcon } from '@heroicons/react/24/outline';
 import { UserAddIcon } from '@atoms/icons-agnostic/index';
 
 export default {
   title: '@atoms/button',
 };
 
-const Template: ComponentStory<any> = (props: {
+const Template: StoryFn<any> = (props: {
   text: string;
   disabled: boolean;
   loading: boolean;
@@ -63,7 +63,7 @@ const Template: ComponentStory<any> = (props: {
         className="my-4 mx-2"
         disabled={props.disabled}
         loading={props.loading}
-        icon={SearchIcon}
+        icon={MagnifyingGlassIcon}
       >
         Search
       </Button>

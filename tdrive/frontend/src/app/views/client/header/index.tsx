@@ -1,4 +1,4 @@
-import { MenuIcon } from '@heroicons/react/outline';
+import { Bars3Icon } from '@heroicons/react/24/outline';
 import Account from '../common/account';
 import Search from '../common/search';
 import { Info } from "@atoms/text";
@@ -32,7 +32,7 @@ export default ({ openSideMenu }: { openSideMenu: () => void }) => {
         onClick={() => openSideMenu()}
         className="sm:hidden block shrink-0 w-10 hover:text-zinc-600 text-zinc-500 cursor-pointer -mx-2 px-2 testid:button-open-side-menu"
       >
-        <MenuIcon className="w-6 h-6" />
+        <Bars3Icon className="w-6 h-6" />
       </div>
 
       <div className="ml-4 mr-4 grow">

@@ -4,19 +4,20 @@ import MenusManager from '@components/menus/menus-manager.jsx';
 /*
   One menu
 */
-export default function Menu({
-  menu,
-  className,
-  style,
-  position,
-  toggle,
-  onOpen,
-  onClose,
-  sortData,
-  testClassId,
-  enableMobileMenu,
-  children,
-}) {
+export default function Menu(props) {
+  const {
+    menu,
+    className,
+    style,
+    position,
+    toggle,
+    onOpen,
+    onClose,
+    sortData,
+    testClassId,
+    enableMobileMenu,
+    children,
+  } = props;
   const containerRef = useRef(null);
   const openRef = useRef(false);
   const previousMenusIdRef = useRef(null);

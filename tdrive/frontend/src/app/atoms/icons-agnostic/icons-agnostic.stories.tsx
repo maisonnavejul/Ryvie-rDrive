@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { cloneElement } from 'react';
-import { ComponentStory } from '@storybook/react';
+import { StoryFn } from '@storybook/react';
 import {
   CopyIcon,
   DeleteIcon,
@@ -46,7 +46,7 @@ const Icon = ({ icon, title }: PropsType): JSX.Element => {
 };
 
 // More on component templates: https://storybook.js.org/docs/react/writing-stories/introduction#using-args
-const Template: ComponentStory<any> = () => {
+const Template: StoryFn<any> = () => {
   return (
     <>
       <div className="flex flex-wrap mb-2">

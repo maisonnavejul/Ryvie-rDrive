@@ -1,4 +1,4 @@
-import { DotsHorizontalIcon, CloudIcon } from '@heroicons/react/outline';
+import { EllipsisHorizontalIcon, CloudIcon } from '@heroicons/react/24/outline';
 import { FolderIcon } from 'app/atoms/icons-colored';
 import { Button } from '@atoms/button/button';
 import { Base, BaseSmall } from '@atoms/text';
@@ -68,7 +68,7 @@ export const FolderRow = memo(({
             theme={'secondary'}
             size="sm"
             className={'!rounded-full !text-gray-500 md:!text-blue-500 bg-transparent md:bg-blue-500 md:bg-opacity-25 '}
-            icon={DotsHorizontalIcon}
+            icon={EllipsisHorizontalIcon}
             testClassId="folder-row-button-open-menu"
           />
         </Menu>

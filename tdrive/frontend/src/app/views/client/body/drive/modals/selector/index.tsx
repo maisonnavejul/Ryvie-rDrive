@@ -1,4 +1,4 @@
-import { DocumentIcon } from '@heroicons/react/solid';
+import { DocumentIcon } from '@heroicons/react/24/solid';
 import { FolderIcon } from 'app/atoms/icons-colored';
 import { Button } from '@atoms/button/button';
 import { Checkbox } from '@atoms/input/input-checkbox';

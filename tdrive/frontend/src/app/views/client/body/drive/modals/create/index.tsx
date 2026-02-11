@@ -7,9 +7,9 @@ import { Application } from '@features/applications/types/application';
 import { Transition } from '@headlessui/react';
 import {
   ChevronLeftIcon,
-  FolderAddIcon,
+  FolderPlusIcon,
   LinkIcon,
-} from '@heroicons/react/outline';
+} from '@heroicons/react/24/outline';
 import { ReactNode } from 'react';
 import { atom, useRecoilState } from 'recoil';
 import { slideXTransition, slideXTransitionReverted } from 'src/utils/transitions';
@@ -80,7 +80,7 @@ export const CreateModal = ({
           >
             <div className="-m-2">
               <CreateModalOption
-                icon={<FolderAddIcon className="w-5 h-5" />}
+                icon={<FolderPlusIcon className="w-5 h-5" />}
                 text={Languages.t('components.create_modal.create_folder')}
                 onClick={() => setState({ ...state, type: 'folder' })}
                 testClassId="create-folder-option"

@@ -1,9 +1,9 @@
 import {
-  DotsHorizontalIcon,
+  EllipsisHorizontalIcon,
   ShieldExclamationIcon,
-  BanIcon,
+  NoSymbolIcon,
   CloudIcon,
-} from '@heroicons/react/outline';
+} from '@heroicons/react/24/outline';
 import { Button } from '@atoms/button/button';
 import { Base, BaseSmall } from '@atoms/text';
 import Menu from '@components/menus/menu';
@@ -99,8 +99,8 @@ export const DocumentRow = memo(({
             {item?.av_status === 'malicious' && (
               <ShieldExclamationIcon className="w-5 text-rose-400" />
             )}
-            {item?.av_status === 'skipped' && <BanIcon className="w-5 text-gray-400" />}
-            {item?.av_status === 'scan_failed' && <BanIcon className="w-5 text-gray-400" />}
+            {item?.av_status === 'skipped' && <NoSymbolIcon className="w-5 text-gray-400" />}
+            {item?.av_status === 'scan_failed' && <NoSymbolIcon className="w-5 text-gray-400" />}
           </BaseSmall>
         </div>
       )}
@@ -110,7 +110,7 @@ export const DocumentRow = memo(({
             theme={'secondary'}
             size="sm"
             className={'!rounded-full !text-gray-500 md:!text-blue-500 bg-transparent md:bg-blue-500 md:bg-opacity-25 '}
-            icon={DotsHorizontalIcon}
+            icon={EllipsisHorizontalIcon}
             testClassId="document-row-button-open-menu"
           />
         </Menu>

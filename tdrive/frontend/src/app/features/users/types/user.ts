@@ -11,6 +11,7 @@ export type UserPreferencesType = null | {
   channel_ordering?: 'chronological' | 'alphabetical';
   recent_workspaces?: { company_id: string; workspace_id: string }[];
   knowledge_graph?: 'all' | 'nothing' | 'metadata';
+  drive_view_mode?: 'list' | 'gallery';
   notifications?: UserNotificationPreferences[];
 };
 

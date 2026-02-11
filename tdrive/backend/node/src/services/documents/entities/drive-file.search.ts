@@ -17,6 +17,12 @@ export default {
     size: entity.last_version_cache?.file_metadata?.size,
   }),
   mongoMapping: {
+    prefix: {
+      name: "text",
+      name_keyword: "text",
+      content_keywords: "text",
+      tags: "text",
+    },
     text: {
       content_keywords: "text",
       tags: "text",

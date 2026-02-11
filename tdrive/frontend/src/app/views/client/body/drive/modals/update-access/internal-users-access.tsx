@@ -11,7 +11,7 @@ import { changeUserAccess, getUserAccessLevel, getAllUserAccesses } from '@featu
 
 import { Input } from '@atoms/input/input-text';
 import { Button } from '@atoms/button/button';
-import { SearchIcon } from '@heroicons/react/solid';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/solid';
 import { InputDecorationIcon } from '@atoms/input/input-decoration-icon';
 import { AccessLevelDropdown } from '../../components/access-level-dropdown';
 import UserBlock from '@molecules/grouped-rows/user';
@@ -87,7 +87,7 @@ export const InternalUsersAccessManager = ({
           }>
           <div className="grow">
             <InputDecorationIcon
-              prefix={SearchIcon}
+              prefix={MagnifyingGlassIcon}
               input={({ className }) => (
                 <Input
                   onFocus={() => setFocus(true)}

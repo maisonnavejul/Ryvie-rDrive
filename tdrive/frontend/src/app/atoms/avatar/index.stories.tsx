@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ComponentStory } from '@storybook/react';
+import { StoryFn } from '@storybook/react';
 import Avatar from '.';
 import { UsersIcon } from '../icons-agnostic';
 
@@ -9,7 +9,7 @@ export default {
 type sizeType = 'lg' | 'md' | 'sm';
 type shapeType = 'circle' | 'square';
 
-const Template: ComponentStory<any> = (args: { title: string }) => {
+const Template: StoryFn<any> = (args: { title: string }) => {
   const types = ['circle', 'square'] as shapeType[];
   const sizes = ['lg', 'md', 'sm'] as sizeType[];
   const values = [

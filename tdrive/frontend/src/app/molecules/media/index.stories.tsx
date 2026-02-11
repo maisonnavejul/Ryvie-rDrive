@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
-import { ComponentStory } from '@storybook/react';
+import { StoryFn } from '@storybook/react';
 
 import Media from '.';
 
@@ -8,7 +8,7 @@ export default {
   title: '@molecules/media',
 };
 
-const Template: ComponentStory<any> = () => {
+const Template: StoryFn<any> = () => {
   const media = [
     {
       img: 'https://images.freeimages.com/images/small-previews/2c8/nature-1363160.jpg',

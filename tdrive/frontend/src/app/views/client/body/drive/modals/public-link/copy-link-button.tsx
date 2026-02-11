@@ -4,7 +4,7 @@ import Languages from 'features/global/services/languages-service';
 import { copyToClipboard } from '@features/global/utils/CopyClipboard';
 
 import { Button } from '@atoms/button/button';
-import { LinkIcon, CheckCircleIcon } from '@heroicons/react/outline';
+import { LinkIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
 export const CopyLinkButton = (props: {
   textToCopy?: string | false;

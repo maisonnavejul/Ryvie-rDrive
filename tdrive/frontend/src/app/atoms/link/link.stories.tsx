@@ -1,6 +1,6 @@
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { ComponentStory, ComponentMeta } from '@storybook/react';
+import { StoryFn, Meta } from '@storybook/react';
 import A from './index';
 
 export default {
@@ -13,9 +13,9 @@ export default {
       </MemoryRouter>
     ),
   ],
-} as ComponentMeta<typeof A>;
+} as Meta<typeof A>;
 
-const Template: ComponentStory<typeof A> = args => <A {...args} />;
+const Template: StoryFn<typeof A> = args => <A {...args} />;
 
 export const Default = Template.bind({});
 Default.args = {

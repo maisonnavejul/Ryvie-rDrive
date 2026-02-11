@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { action } from '@storybook/addon-actions';
 
 import { RecoilRoot } from 'recoil';
-import { ComponentStory } from '@storybook/react';
-import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/outline';
+import { StoryFn } from '@storybook/react';
+import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 
 import { ConfirmModal, ConfirmModalProps } from './confirm';
 const icons = {
@@ -36,7 +36,7 @@ export default {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const Template: ComponentStory<any> = (props: ConfirmModalProps) => {
+const Template: StoryFn<any> = (props: ConfirmModalProps) => {
   const [open, setOpen] = useState(true);
 
   return (
