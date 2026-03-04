@@ -64,7 +64,7 @@ const SharedDriveModalContent = (props: {
     setIsUpdating(true);
     try {
       const targets = (ids && ids.length ? ids : [id]);
-      ToasterService.info(`Partage vers Shared Drive en cours (${accessLevel}) pour ${targets.length} élément(s)...`);
+      ToasterService.info(`Partage vers le Drive partagé en cours (${accessLevel}) pour ${targets.length} élément(s)...`);
       
       // Ajouter ou mettre à jour l'entité "shared_drive" aux permissions existantes
       const buildUpdated = (current: DriveItem['access_info']) => ({
@@ -93,11 +93,11 @@ const SharedDriveModalContent = (props: {
         manage: 'gestion complète'
       }[accessLevel];
       
-      ToasterService.success(`${targets.length} élément(s) partagé(s) dans Shared Drive avec accès ${accessLevelText}.`);
+      ToasterService.success(`${targets.length} élément(s) partagé(s) dans le Drive partagé avec accès ${accessLevelText}.`);
       await refresh(id); // Rafraîchir les données de l'élément affiché
     } catch (error) {
       console.error('Error sharing to Shared Drive:', error);
-      ToasterService.error(`Erreur lors du partage dans Shared Drive.`);
+      ToasterService.error(`Erreur lors du partage dans le Drive partagé.`);
     } finally {
       setIsUpdating(false);
     }
@@ -109,7 +109,7 @@ const SharedDriveModalContent = (props: {
     setIsUpdating(true);
     try {
       const targets = (ids && ids.length ? ids : [id]);
-      ToasterService.info(`Suppression du partage Shared Drive en cours pour ${targets.length} élément(s)...`);
+      ToasterService.info(`Suppression du partage Drive partagé en cours pour ${targets.length} élément(s)...`);
       
       const buildUpdated = (current: DriveItem['access_info']) => ({
         ...current,
@@ -127,11 +127,11 @@ const SharedDriveModalContent = (props: {
         );
       }
       
-      ToasterService.success(`${targets.length} élément(s) retiré(s) du Shared Drive.`);
+      ToasterService.success(`${targets.length} élément(s) retiré(s) du Drive partagé.`);
       await refresh(id); // Rafraîchir les données de l'élément affiché
     } catch (error) {
       console.error('Error removing from Shared Drive:', error);
-      ToasterService.error(`Erreur lors de la suppression du Shared Drive.`);
+      ToasterService.error(`Erreur lors de la suppression du Drive partagé.`);
     } finally {
       setIsUpdating(false);
     }
@@ -141,7 +141,7 @@ const SharedDriveModalContent = (props: {
     <ModalContent
       title={
           <>
-            {'Partage Shared Drive - '}
+            {'Partage Drive partagé - '}
             <strong>{(ids && ids.length > 1) ? `${ids.length} éléments` : item?.name}</strong>
           </>
         }
@@ -151,7 +151,7 @@ const SharedDriveModalContent = (props: {
           {isSharedInSharedDrive ? (
             <div>
               <p className="text-sm text-gray-600 mb-4">
-                Ce fichier est actuellement partagé dans le Shared Drive avec un accès <strong>{currentSharedDriveLevel === 'read' ? 'lecture seule' : currentSharedDriveLevel === 'write' ? 'lecture et écriture' : 'gestion complète'}</strong>.
+                Ce fichier est actuellement partagé dans le Drive partagé avec un accès <strong>{currentSharedDriveLevel === 'read' ? 'lecture seule' : currentSharedDriveLevel === 'write' ? 'lecture et écriture' : 'gestion complète'}</strong>.
               </p>
               
               <div className="space-y-2">
@@ -196,7 +196,7 @@ const SharedDriveModalContent = (props: {
                     className="flex items-center space-x-2 px-3 py-2 text-left hover:bg-red-100 text-red-600 rounded"
                   >
                     <span>🗑️</span>
-                    <span>Retirer du Shared Drive</span>
+                    <span>Retirer du Drive partagé</span>
                   </button>
                 </div>
               </div>
@@ -204,7 +204,7 @@ const SharedDriveModalContent = (props: {
           ) : (
             <div>
               <p className="text-sm text-gray-600 mb-4">
-                Choisissez le niveau d'accès pour partager ce fichier dans le Shared Drive :
+                Choisissez le niveau d'accès pour partager ce fichier dans le Drive partagé :
               </p>
               
               <div className="flex flex-col space-y-2">

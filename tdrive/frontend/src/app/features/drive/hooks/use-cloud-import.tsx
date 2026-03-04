@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef } from 'react';
+import { useRecoilState } from 'recoil';
 import { DriveApiClient } from '../api-client/api-client';
 import { useDriveActions } from './use-drive-actions';
 import { useCurrentUser } from 'app/features/users/hooks/use-current-user';
@@ -7,6 +8,7 @@ import { ToasterService } from '@features/global/services/toaster-service';
 import Logger from '@features/global/framework/logger-service';
 import FileUploadService from '@features/files/services/file-upload-service';
 import JWTStorage from '@features/auth/jwt-storage-service';
+import { SyncProgressAtom } from '../state/sync-progress';
 
 const logger = Logger.getLogger('CloudImportHook');
 
@@ -28,6 +30,8 @@ export const useCloudImport = () => {
     total: number;
     currentFile: string;
   } | null>(null);
+  const [syncProgress, setSyncProgress] = useRecoilState(SyncProgressAtom);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Utiliser des chemins relatifs pour passer par Nginx (/api)
   const backendUrl = '';
@@ -278,14 +282,24 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
       return;
     }
 
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     setImporting(true);
     setImportProgress({ current: 0, total: 0, currentFile: 'Initialisation de la synchronisation...' });
+    setSyncProgress({ active: true, provider, current: 0, total: 0, currentFile: 'Initialisation...', cancelled: false });
 
     try {
       logger.info(`🚀 Starting 2-phase ${provider.toUpperCase()} sync from ${dropboxPath} to ${targetFolderId}`);
+      console.log(`🔑 driveParentId envoyé au backend: "${targetFolderId}"`);
       
       // === PHASE 1: Analyse de l'arborescence ===
-      setImportProgress({ current: 0, total: 0, currentFile: `Analyse de l'arborescence ${provider.toUpperCase()}...` });
+      const updateProgress = (current: number, total: number, currentFile: string) => {
+        setImportProgress({ current, total, currentFile });
+        setSyncProgress(prev => prev.cancelled ? prev : { ...prev, current, total, currentFile });
+      };
+
+      updateProgress(0, 0, `Analyse de l'arborescence ${provider.toUpperCase()}...`);
       
       const analyzeResponse = await fetch(`${backendUrl}/api/v1/rclone/analyze`, {
         method: 'POST',
@@ -293,11 +307,14 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
           'Content-Type': 'application/json',
           'Authorization': authHeader
         },
+        signal: abortController.signal,
         body: JSON.stringify({
           path: dropboxPath,
           userEmail: user.email,
           driveParentId: targetFolderId,
-          provider: provider
+          provider: provider,
+          userId: user.id,
+          companyId: company
         })
       });
       
@@ -318,12 +335,12 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
         
         console.log(`\n📊 === DIAGNOSTIC ${provider.toUpperCase()} vs MyDrive (AVANT SYNC) ===`);
         
-        console.log(`\n📁 ${provider.toUpperCase()} FOLDERS:`);
+        console.log(`\n📁 ${provider.toUpperCase()} FOLDERS (premier niveau):`);
         dropbox.folders.forEach((folder: any) => {
           console.log(`  📁 ${folder.name} - ${folder.sizeKB} KB`);
         });
         
-        console.log(`\n📄 ${provider.toUpperCase()} FILES (racine uniquement):`);
+        console.log(`\n📄 ${provider.toUpperCase()} FILES (racine): ${dropbox.files.length} | Total récursif: ${dropbox.totalRecursiveFiles || totalFiles}`);
         dropbox.files.forEach((file: any) => {
           console.log(`  📄 ${file.name} - ${file.sizeKB} KB`);
         });
@@ -339,21 +356,22 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
         });
         
         console.log('\n📊 SUMMARY:');
-        console.log(`  ${provider.toUpperCase()}: ${dropbox.files.length} files, ${dropbox.folders.length} folders`);
-        console.log(`  MyDrive: ${myDrive.files.length} files, ${myDrive.folders.length} folders`);
+        console.log(`  ${provider.toUpperCase()}: ${dropbox.totalRecursiveFiles || totalFiles} fichiers total (${dropbox.files.length} racine), ${dropbox.folders.length} dossiers`);
+        console.log(`  MyDrive (dossier sync): ${myDrive.files.length} fichiers racine, ${myDrive.folders.length} dossiers`);
         
         // Afficher les éléments à synchroniser
         if (analyzeData.diagnostic.toSync) {
           const { toSync } = analyzeData.diagnostic;
           console.log('\n🔄 ÉLÉMENTS À SYNCHRONISER:');
-          console.log(`  📁 Dossiers: ${toSync.folders.length}/${dropbox.folders.length}`);
+          console.log(`  📁 Dossiers à sync: ${toSync.folders.length}/${dropbox.folders.length}`);
           toSync.folders.forEach((folder: any) => {
             console.log(`    ✅ ${folder.name} - ${folder.sizeKB} KB`);
           });
-          console.log(`  📄 Fichiers: ${toSync.files.length}/${dropbox.files.length}`);
+          console.log(`  📄 Fichiers racine à sync: ${toSync.files.length}/${dropbox.files.length}`);
           toSync.files.forEach((file: any) => {
             console.log(`    ✅ ${file.name} - ${file.sizeKB} KB`);
           });
+          console.log(`  📄 Total fichiers à sync (racine + dossiers): ${toSync.totalFilesToSync || 'N/A'}`);
           
           if (toSync.folders.length === 0 && toSync.files.length === 0) {
             console.log('  ℹ️ Aucun élément à synchroniser (tout est à jour)');
@@ -363,15 +381,17 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
         console.log('\n=== FIN DIAGNOSTIC (AVANT SYNC) ===\n');
         
         // Afficher aussi dans un toast pour l'utilisateur
-        const syncCount = analyzeData.diagnostic.toSync ? 
-          analyzeData.diagnostic.toSync.folders.length + analyzeData.diagnostic.toSync.files.length : 0;
-        ToasterService.info(`📊 Diagnostic: ${syncCount} éléments à synchroniser | ${provider.toUpperCase()} ${dropbox.files.length} fichiers, ${dropbox.folders.length} dossiers`);
+        const syncFilesCount = analyzeData.diagnostic.toSync?.totalFilesToSync || 0;
+        const syncFoldersCount = analyzeData.diagnostic.toSync?.folders?.length || 0;
+        const syncCount = syncFoldersCount + syncFilesCount;
+        ToasterService.info(`📊 Diagnostic: ${syncFoldersCount} dossiers + ${syncFilesCount} fichiers à synchroniser`);
         
         // Si rien à synchroniser, arrêter ici
         if (syncCount === 0) {
           console.log('ℹ️ Aucun élément à synchroniser - arrêt du processus');
           setImportProgress(null);
           setImporting(false);
+          setSyncProgress({ active: false, provider: '', current: 0, total: 0, currentFile: '', cancelled: false });
           ToasterService.success('✅ Synchronisation terminée - tout est à jour');
           return;
         }
@@ -392,22 +412,19 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
       console.log(`📁 Dossiers à créer filtrés: ${filteredFoldersToCreate.length}/${foldersToCreate.length}`);
       filteredFoldersToCreate.forEach(path => console.log(`  📁 ${path}`));
       
-      setImportProgress({ 
-        current: 0, 
-        total: filteredFoldersToCreate.length + totalFiles, 
-        currentFile: 'Création des dossiers...' 
-      });
+      // Utiliser le nombre réel de fichiers à synchroniser si disponible
+      const realFilesToSync = analyzeData.diagnostic?.toSync?.totalFilesToSync || totalFiles;
+      const totalElements = filteredFoldersToCreate.length + realFilesToSync;
+      updateProgress(0, totalElements, 'Création des dossiers...');
       
       const folderMap: Record<string, string> = {};
       
       // Créer seulement les dossiers filtrés
       for (let i = 0; i < filteredFoldersToCreate.length; i++) {
         const folderPath = filteredFoldersToCreate[i];
-        setImportProgress({ 
-          current: i + 1, 
-          total: filteredFoldersToCreate.length + totalFiles, 
-          currentFile: `Création du dossier: ${folderPath}` 
-        });
+        // Check cancellation
+        if (abortController.signal.aborted) throw new DOMException('Synchronisation annulée', 'AbortError');
+        updateProgress(i + 1, totalElements, `Création du dossier: ${folderPath}`);
         
         try {
           // Déterminer le dossier parent
@@ -439,11 +456,8 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
       }
       
       // === PHASE 3: Synchronisation des fichiers ===
-      setImportProgress({ 
-        current: foldersToCreate.length, 
-        total: foldersToCreate.length + totalFiles, 
-        currentFile: 'Synchronisation des fichiers...' 
-      });
+      if (abortController.signal.aborted) throw new DOMException('Synchronisation annulée', 'AbortError');
+      updateProgress(filteredFoldersToCreate.length, totalElements, 'Synchronisation des fichiers...');
       
       logger.info(`📁 Folder map created:`, folderMap);
       
@@ -454,12 +468,15 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
           'Content-Type': 'application/json',
           'Authorization': authHeader
         },
+        signal: abortController.signal,
         body: JSON.stringify({
           path: dropboxPath,
           userEmail: user.email,
           driveParentId: targetFolderId,
           folderMap: folderMap,
-          provider: provider
+          provider: provider,
+          userId: user.id,
+          companyId: company
         })
       });
       
@@ -473,11 +490,7 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
       logger.info('✅ 2-phase sync completed:', syncResult);
       
       // Mettre à jour le progrès final
-      setImportProgress({ 
-        current: foldersToCreate.length + totalFiles, 
-        total: foldersToCreate.length + totalFiles, 
-        currentFile: 'Synchronisation terminée !' 
-      });
+      updateProgress(totalElements, totalElements, 'Synchronisation terminée !');
       
       // Rafraîchir l'affichage
       await refresh(targetFolderId);
@@ -493,18 +506,34 @@ const downloadUrl = `${backendUrl}/api/v1/files/rclone/download?path=${safePath}
       }
       
     } catch (error) {
-      logger.error('❌ Sync failed:', error);
-      ToasterService.error(`Erreur lors de la synchronisation: ${(error as Error).message}`);
+      if ((error as Error).name === 'AbortError') {
+        logger.info('🛑 Sync cancelled by user');
+        ToasterService.info('Synchronisation annulée');
+      } else {
+        logger.error('❌ Sync failed:', error);
+        ToasterService.error(`Erreur lors de la synchronisation: ${(error as Error).message}`);
+      }
     } finally {
       setImporting(false);
       setImportProgress(null);
+      setSyncProgress({ active: false, provider: '', current: 0, total: 0, currentFile: '', cancelled: false });
+      abortControllerRef.current = null;
     }
-  }, [user, importing, backendUrl, authHeader, refresh]);
+  }, [user, importing, backendUrl, authHeader, refresh, setSyncProgress]);
   
+
+  const cancelSync = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      setSyncProgress(prev => ({ ...prev, cancelled: true, currentFile: 'Annulation en cours...' }));
+    }
+  }, [setSyncProgress]);
 
   return {
     importing,
     importProgress,
-    importDropboxFolder
+    importDropboxFolder,
+    cancelSync,
+    syncProgress,
   };
 };

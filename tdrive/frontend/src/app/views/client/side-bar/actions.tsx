@@ -115,7 +115,9 @@ export default () => {
   // Détecter si on est dans le Drive partagé (root), Partagé avec moi, ou Corbeille
   const isInSharedDrive = viewId === 'root' || parentId === 'root';
   const isInSharedWithMe = viewId === 'shared_with_me';
+  const isInMyDrive = viewId?.startsWith('user_') || parentId?.startsWith('user_');
   const shouldHideCreateButton = isInSharedDrive || isInSharedWithMe || inTrash;
+  const shouldHideUploadButton = !isInMyDrive || isInCloudProvider;
 
   const setConfirmDeleteModalState = useSetRecoilState(ConfirmDeleteModalAtom);
   const setCreationModalState = useSetRecoilState(CreateModalAtom);
@@ -173,17 +175,19 @@ export default () => {
             testClassId="sidebar-action-upload-zone"
           />
 
-          <Button
-            onClick={() => uploadItemModal()}
-            shortcut='U'
-            size="lg"
-            theme="primary"
-            className="w-full mb-2 justify-center"
-            style={{ boxShadow: '0 0 10px 0 rgba(0, 122, 255, 0.5)' }}
-            testClassId="button-upload"
-          >
-            <ArrowUpTrayIcon className="w-5 h-5 mr-2" /> {Languages.t('components.side_menu.buttons.upload')}
-          </Button>
+          {!shouldHideUploadButton && (
+            <Button
+              onClick={() => uploadItemModal()}
+              shortcut='U'
+              size="lg"
+              theme="primary"
+              className="w-full mb-2 justify-center"
+              style={{ boxShadow: '0 0 10px 0 rgba(0, 122, 255, 0.5)' }}
+              testClassId="button-upload"
+            >
+              <ArrowUpTrayIcon className="w-5 h-5 mr-2" /> {Languages.t('components.side_menu.buttons.upload')}
+            </Button>
+          )}
           {!shouldHideCreateButton && (
             <Button
               onClick={() => openItemModal()}

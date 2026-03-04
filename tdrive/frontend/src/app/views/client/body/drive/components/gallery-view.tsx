@@ -219,8 +219,14 @@ export const GalleryView: React.FC<GalleryViewProps> = memo(
             };
             if (isDir) {
               return (
-                <Droppable key={item.id} id={index}>
-                  <GalleryItemCard {...cardProps} />
+                <Droppable key={item.id} id={index} data={{ item }}>
+                  {isMobile ? (
+                    <GalleryItemCard {...cardProps} />
+                  ) : (
+                    <Draggable id={index} data={{ item }}>
+                      <GalleryItemCard {...cardProps} />
+                    </Draggable>
+                  )}
                 </Droppable>
               );
             }

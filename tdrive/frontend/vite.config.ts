@@ -50,7 +50,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    host: '0.0.0.0',
+    port: 3010,
     proxy: {
       '/internal': {
         target: 'http://127.0.0.1:4000',
@@ -59,6 +60,19 @@ export default defineConfig({
       '/plugins': {
         target: 'http://127.0.0.1:4000',
         changeOrigin: true,
+      },
+      '/api': {
+        target: 'http://127.0.0.1:4000',
+        changeOrigin: true,
+        configure: (proxy) => {
+          // 10 min timeout pour les longues sync cloud
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.socket?.setTimeout(600000);
+          });
+          proxy.on('proxyRes', (proxyRes) => {
+            proxyRes.socket?.setTimeout(600000);
+          });
+        },
       },
     },
   },

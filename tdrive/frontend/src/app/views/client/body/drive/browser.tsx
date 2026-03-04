@@ -4,11 +4,11 @@ import { Base, BaseSmall, Subtitle, Title } from '@atoms/text';
 import Menu from '@components/menus/menu';
 import { getFilesTree } from '@components/uploads/file-tree-utils';
 import UploadZone from '@components/uploads/upload-zone';
-import { setTdriveTabToken } from '@features/drive/api-client/api-client';
+import { setTdriveTabToken, DriveApiClient } from '@features/drive/api-client/api-client';
 import { useDriveItem } from '@features/drive/hooks/use-drive-item';
 import { useDriveUpload } from '@features/drive/hooks/use-drive-upload';
 import { useDrivePrefetch } from '@features/drive/hooks/use-drive-prefetch';
-import { DriveItemSelectedList, DriveItemSort, DriveNavigationState } from '@features/drive/state/store';
+import { DriveItemSelectedList, DriveItemSort, DriveNavigationState, DriveItemTypeFilter, DriveTypeFilter } from '@features/drive/state/store';
 import { formatBytes } from '@features/drive/utils';
 import useRouterCompany from '@features/router/hooks/use-router-company';
 import useRouterWorkspace from '@features/router/hooks/use-router-workspace';
@@ -27,7 +27,7 @@ import {
 import { DocumentRow, DocumentRowOverlay } from './documents/document-row';
 import { useDrivePreview } from '@features/drive/hooks/use-drive-preview';
 import { FolderRow } from './documents/folder-row';
-import { FolderRowSkeleton } from './documents/folder-row-skeleton';
+import { FolderRowSkeleton, GallerySkeleton } from './documents/folder-row-skeleton';
 import HeaderPath from './header-path';
 import { ConfirmDeleteModal } from './modals/confirm-delete';
 import { ConfirmTrashModal } from './modals/confirm-trash';
@@ -61,6 +61,8 @@ import { useHistory } from 'react-router-dom';
 import { SortIcon } from 'app/atoms/icons-agnostic';
 import { useUploadExp } from 'app/features/files/hooks/use-exp-upload';
 import GalleryView from './components/gallery-view';
+import { hasSharedDriveAccess } from '@features/files/utils/access-info-helpers';
+import { SyncProgressBar } from './components/sync-progress-bar';
 
 export const DriveCurrentFolderAtom = atomFamily<
   string,
@@ -130,12 +132,57 @@ export default memo(
     useDrivePrefetch();
 
     // Chargement optimisé : navigation instantanée + chargement des données
-    const loading = loadingParent || loadingParentChange;
+    const rawLoading = loadingParent || loadingParentChange;
     const isNavigatingInstantly = navigationState.isNavigating;
     
     // Mémoisation des items pour éviter les re-calculs coûteux
     const memoizedItems = useMemo(() => children || [], [children]);
     const itemsCount = memoizedItems.length;
+
+    // Simple loading logic with minimum skeleton display time:
+    // - hasLoadedOnce tracks if data arrived at least once for this parentId
+    // - Once loaded, we never go back to loading/skeleton state (background refreshes are invisible)
+    // - On navigation (parentId change), reset hasLoadedOnce so skeleton shows again
+    // - Enforce minimum 300ms skeleton display to prevent flash
+    const prevParentIdRef = useRef(parentId);
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+    const skeletonStartTimeRef = useRef<number | null>(null);
+    const shouldHideItems = prevParentIdRef.current !== parentId;
+    
+    useEffect(() => {
+      if (prevParentIdRef.current !== parentId) {
+        setHasLoadedOnce(false);
+        skeletonStartTimeRef.current = Date.now(); // Start skeleton timer on navigation
+        prevParentIdRef.current = parentId;
+      }
+    }, [parentId]);
+    
+    useEffect(() => {
+      if (!rawLoading && !hasLoadedOnce) {
+        // Enforce minimum skeleton display time (300ms)
+        const skeletonStartTime = skeletonStartTimeRef.current;
+        if (skeletonStartTime) {
+          const elapsed = Date.now() - skeletonStartTime;
+          const minDisplayTime = 300;
+          if (elapsed < minDisplayTime) {
+            // Wait for remaining time before marking as loaded
+            const remaining = minDisplayTime - elapsed;
+            setTimeout(() => {
+              setHasLoadedOnce(true);
+              skeletonStartTimeRef.current = null;
+            }, remaining);
+          } else {
+            setHasLoadedOnce(true);
+            skeletonStartTimeRef.current = null;
+          }
+        } else {
+          setHasLoadedOnce(true);
+        }
+      }
+    }, [rawLoading, hasLoadedOnce]);
+
+    // loading is only true before the first successful load for this folder
+    const loading = !hasLoadedOnce;
     
     // Virtualisation légère pour les grandes listes - CHARGEMENT PROGRESSIF
     const VIRT_PAGE_SIZE = 50; // Réduire pour afficher plus rapidement
@@ -165,11 +212,59 @@ export default memo(
       setVisibleRange({ start: 0, end: shouldVirtualize ? Math.min(VIRT_PAGE_SIZE, itemsCount) : itemsCount });
     }, [itemsCount, shouldVirtualize]);
     
+    // Filtre "fichiers partagés" pour Mon Drive
+    const [showSharedOnly, setShowSharedOnly] = useState(false);
+    const isMyDrive = viewId?.startsWith('user_') || parentId?.startsWith('user_');
+    const [typeFilter] = useRecoilState(DriveItemTypeFilter);
+
+    // Helper pour matcher un item selon le filtre de type
+    const matchesTypeFilter = useCallback((item: any, filter: DriveTypeFilter): boolean => {
+      if (!filter) return true;
+      if (filter === 'folder') return item.is_directory;
+      if (item.is_directory) return false; // Les autres filtres excluent les dossiers
+      
+      const ext = (item.extension || item.name?.split('.').pop() || '').toLowerCase();
+      const mime = item.last_version_cache?.file_metadata?.mime || '';
+      
+      switch (filter) {
+        case 'document':
+          return ['doc', 'docx', 'odt', 'txt', 'rtf'].includes(ext) || mime.includes('document') || mime.includes('text');
+        case 'spreadsheet':
+          return ['xls', 'xlsx', 'ods', 'csv'].includes(ext) || mime.includes('spreadsheet');
+        case 'presentation':
+          return ['ppt', 'pptx', 'odp'].includes(ext) || mime.includes('presentation');
+        case 'pdf':
+          return ext === 'pdf' || mime === 'application/pdf';
+        case 'image':
+          return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico'].includes(ext) || mime.startsWith('image/');
+        case 'video':
+          return ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv'].includes(ext) || mime.startsWith('video/');
+        case 'audio':
+          return ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext) || mime.startsWith('audio/');
+        default:
+          return true;
+      }
+    }, []);
+
     const visibleItems = useMemo(() => {
-      return shouldVirtualize 
+      const sliced = shouldVirtualize 
         ? memoizedItems.slice(visibleRange.start, visibleRange.end)
         : memoizedItems;
-    }, [memoizedItems, visibleRange, shouldVirtualize]);
+      
+      let filtered = sliced;
+      
+      // Filtre partagé
+      if (showSharedOnly && isMyDrive) {
+        filtered = filtered.filter(item => hasSharedDriveAccess(item));
+      }
+      
+      // Filtre par type
+      if (typeFilter) {
+        filtered = filtered.filter(item => matchesTypeFilter(item, typeFilter));
+      }
+      
+      return filtered;
+    }, [memoizedItems, visibleRange, shouldVirtualize, showSharedOnly, isMyDrive, typeFilter, matchesTypeFilter]);
 
     const uploadZone = 'drive_' + companyId;
     const uploadZoneRef = useRef<UploadZone | null>(null);
@@ -322,16 +417,25 @@ export default memo(
       };
     }, [onMouseMoveWindow, onMouseUpWindow]);
 
+    function getItemFromDndData(data: any): any {
+      // Support explicit item field (new) or child.props.item (legacy)
+      return data?.item || data?.child?.props?.item;
+    }
     function handleDragStart(event: any) {
       setActiveIndex(event.active.id);
-      setActiveChild(event.active.data.current.child.props.item);
+      setActiveChild(getItemFromDndData(event.active.data.current));
     }
     function handleDragEnd(event: any) {
       setActiveIndex(null);
       setActiveChild(null);
       if (event.over) {
-        const draggedItem = event.active.data.current.child.props.item;
-        const targetFolderId = inTrash ? 'root' : event.over.data.current.child.props.item.id;
+        const draggedItem = getItemFromDndData(event.active.data.current);
+        const targetFolderId = inTrash ? 'root' : getItemFromDndData(event.over.data.current)?.id;
+
+        if (!draggedItem || !targetFolderId) return;
+
+        // Prevent dropping a folder into itself
+        if (draggedItem.id === targetFolderId) return;
 
         // Collect all items to move: if dragged item is checked, move all checked items
         const checkedIds = Object.keys(checked).filter(id => checked[id]);
@@ -522,37 +626,89 @@ export default memo(
     // Détecter si on est dans une vue Google Drive
     const isGoogleDriveView = parentId?.startsWith('googledrive_');
     
+    // Helper: find or create a dedicated sync folder inside Mon Drive
+    const findOrCreateSyncFolder = useCallback(async (folderName: string): Promise<string> => {
+      const myDriveId = 'user_' + user?.id;
+      console.log(`🔍 findOrCreateSyncFolder: looking for "${folderName}" in Mon Drive (${myDriveId})`);
+      
+      // Browse Mon Drive to find existing folder
+      try {
+        const details = await DriveApiClient.browse(companyId, myDriveId, { company_id: companyId }, { by: 'date', order: 'desc' }, { page: 0, limit: 200, nextPage: { page_token: '' } });
+        const allChildren = details?.children || [];
+        const allFolders = allChildren.filter((c: any) => c.is_directory);
+        
+        console.log(`📂 Mon Drive contains ${allChildren.length} items (${allFolders.length} folders):`);
+        allFolders.forEach((f: any) => console.log(`  📁 "${f.name}" (id: ${f.id})`));
+        
+        const existing = allFolders.find(
+          (c: any) => c.name === folderName
+        );
+        
+        if (existing) {
+          console.log(`✅ Found existing sync folder: "${existing.name}" (id: ${existing.id})`);
+          
+          // Vérifier le contenu du dossier trouvé
+          try {
+            const folderContent = await DriveApiClient.browse(companyId, existing.id, { company_id: companyId }, { by: 'date', order: 'desc' }, { page: 0, limit: 200, nextPage: { page_token: '' } });
+            const folderChildren = folderContent?.children || [];
+            console.log(`📂 Sync folder "${existing.name}" contains ${folderChildren.length} items:`);
+            folderChildren.forEach((item: any) => console.log(`  ${item.is_directory ? '📁' : '📄'} "${item.name}" (id: ${item.id})`));
+          } catch (e) {
+            console.warn('Could not browse sync folder content:', e);
+          }
+          
+          return existing.id;
+        }
+        
+        console.log(`⚠️ No folder named "${folderName}" found in Mon Drive, creating...`);
+      } catch (e) {
+        console.warn('Could not browse Mon Drive to find sync folder:', e);
+      }
+      
+      // Create the folder
+      const created = await DriveApiClient.create(companyId, {
+        item: {
+          company_id: companyId,
+          workspace_id: 'drive',
+          parent_id: myDriveId,
+          name: folderName,
+          is_directory: true,
+        },
+      });
+      console.log(`✅ Created new sync folder: "${folderName}" (id: ${created.id})`);
+      return created.id;
+    }, [user?.id, companyId]);
+
     // Fonction pour synchroniser les fichiers Dropbox
     const handleDropboxSync = useCallback(async () => {
       if (!isDropboxView) return;
       
-      // Extraire le chemin Dropbox du parentId
       const dropboxPath = parentId === 'dropbox_root' ? '' : parentId.replace('dropbox_', '').replace(/_/g, '/');
       
       try {
-        await importDropboxFolder(dropboxPath, 'user_' + user?.id);
+        const syncFolderId = await findOrCreateSyncFolder('Dropbox');
+        await importDropboxFolder(dropboxPath, syncFolderId);
       } catch (error) {
         console.error('Erreur lors de la synchronisation Dropbox:', error);
       }
-    }, [isDropboxView, parentId, importDropboxFolder, user?.id]);
+    }, [isDropboxView, parentId, importDropboxFolder, findOrCreateSyncFolder]);
     
     // Fonction pour synchroniser les fichiers Google Drive
     const handleGoogleDriveSync = useCallback(async () => {
       if (!isGoogleDriveView || importingGoogleDrive) return;
       
-      // Extraire le chemin Google Drive du parentId
       const googleDrivePath = parentId === 'googledrive_root' ? '' : parentId.replace('googledrive_', '').replace(/_/g, '/');
       
       setImportingGoogleDrive(true);
       try {
-        // Synchroniser vers un dossier Google Drive séparé pour éviter le mélange avec Dropbox
-        await importDropboxFolder(googleDrivePath, 'user_' + user?.id, { provider: 'googledrive' });
+        const syncFolderId = await findOrCreateSyncFolder('Google Drive');
+        await importDropboxFolder(googleDrivePath, syncFolderId, { provider: 'googledrive' });
       } catch (error) {
         console.error('Erreur lors de la synchronisation Google Drive:', error);
       } finally {
         setImportingGoogleDrive(false);
       }
-    }, [isGoogleDriveView, parentId, importDropboxFolder, user?.id, importingGoogleDrive]);
+    }, [isGoogleDriveView, parentId, importDropboxFolder, importingGoogleDrive, findOrCreateSyncFolder]);
 
     // View mode: list (default) or gallery, persisted per user
     const viewModeKey = `drive_view_mode_${user?.id || 'default'}`;
@@ -662,21 +818,19 @@ export default memo(
             <ConfirmDeleteModal />
             <ConfirmTrashModal />
             <ConfirmModal />
+            <SyncProgressBar />
             <Suspense fallback={<></>}>
               <DrivePreview items={documents} />
             </Suspense>
             <div
-              className={
-                'flex flex-col grow h-full overflow-hidden ' +
-                (loading && (!items?.length || loadingParentChange) ? 'opacity-50 ' : '')
-              }
+              className="flex flex-col grow h-full overflow-hidden"
             >
               <div
                 className={`flex flex-row shrink-0 items-center mb-4 ${
-                  !sharedWithMe ? 'flex-wrap' : ''
+                  viewId !== 'shared_with_me' ? 'flex-wrap' : ''
                 } border-b md:border-b-0 px-4 py-2 md:px-0 md:py-0`}
               >
-                {sharedWithMe ? (
+                {viewId === 'shared_with_me' ? (
                   <div>
                     <Title className="mb-4 block">
                       {Languages.t('scenes.app.shared_with_me.shared_with_me')}
@@ -769,7 +923,7 @@ export default memo(
 
                 {buttonsVisible && (
                   <Menu
-                    menu={() => onBuildSortContextMenu()}
+                    menu={() => onBuildSortContextMenu(isMyDrive, showSharedOnly, setShowSharedOnly)}
                     sortData={sortLabel}
                     testClassId="browser-menu-sorting"
                   >
@@ -923,9 +1077,11 @@ export default memo(
 
               <DndContext sensors={sensors} onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
                 <div className="grow overflow-auto relative" ref={scrollViewer} onMouseDown={onMouseDownScroll}>
-                  {/* Indicateur unique de chargement des fichiers (seulement pendant le chargement initial) */}
-                  {loading && itemsCount === 0 && <FolderRowSkeleton />}
-                  {itemsCount === 0 && !loading && (
+                  {/* Skeleton pendant le chargement initial (adapté au mode d'affichage) */}
+                  {loading && itemsCount === 0 && !hasLoadedOnce && (
+                    viewMode === 'gallery' ? <GallerySkeleton /> : <FolderRowSkeleton />
+                  )}
+                  {itemsCount === 0 && !loading && hasLoadedOnce && (
                     <div className="mt-4 text-center border-2 border-dashed rounded-md p-8">
                       <Subtitle className="block mb-2">
                         {Languages.t('scenes.app.drive.nothing')}
@@ -949,61 +1105,69 @@ export default memo(
                     </div>
                   )}
                   {viewMode === 'gallery' ? (
-                    <GalleryView
-                      items={visibleItems as any}
-                      checked={checked}
-                      onCheck={(id, v) => setChecked(_.pickBy({ ...checked, [id]: v }, _.identity))}
-                      buildContextMenu={(it: any) => onBuildContextMenu(details, it)}
-                      onOpenFolder={(id: string) => {
-                        const route = RouterServices.generateRouteFromState({ dirId: id });
-                        history.push(route);
-                        if (inPublicSharing) return setParentId(id);
-                      }}
-                      onOpenFile={(id: string) => {
-                        const it = children.find(c => c.id === id) || items.find(c => c.id === id);
-                        if (it && !it.is_directory) {
-                          openFileItem(it);
-                        }
-                      }}
-                      onContextMenu={(it: any, evt: React.MouseEvent) => {
-                        evt.preventDefault();
-                        onBuildContextMenu(details, it);
-                      }}
-                    />
+                    !shouldHideItems && (
+                      <GalleryView
+                        items={visibleItems as any}
+                        checked={checked}
+                        onCheck={(id, v) => setChecked(_.pickBy({ ...checked, [id]: v }, _.identity))}
+                        buildContextMenu={(it: any) => onBuildContextMenu(details, it)}
+                        onOpenFolder={(id: string) => {
+                          const route = RouterServices.generateRouteFromState({ dirId: id });
+                          history.push(route);
+                          if (inPublicSharing) return setParentId(id);
+                        }}
+                        onOpenFile={(id: string) => {
+                          const it = children.find(c => c.id === id) || items.find(c => c.id === id);
+                          if (it && !it.is_directory) {
+                            openFileItem(it);
+                          }
+                        }}
+                        onContextMenu={(it: any, evt: React.MouseEvent) => {
+                          evt.preventDefault();
+                          onBuildContextMenu(details, it);
+                        }}
+                      />
+                    )
                   ) : (
-                    <>
-                      {visibleItems.map((child, index) =>
+                    !shouldHideItems && (
+                      <>
+                        {visibleItems.map((child, index) =>
                         child.is_directory ? (
-                          <Droppable id={index} key={index}>
-                            <FolderRow
-                              key={index}
-                              className={
-                                (index === 0 ? 'rounded-t-md ' : '-mt-px ') +
-                                (index === visibleItems.length - 1 ? 'rounded-b-md ' : '') +
-                                'border-0 md:border'
-                              }
-                              item={child}
-                              onClick={() => {
-                                const route = RouterServices.generateRouteFromState({
-                                  dirId: child.id,
-                                });
-                                history.push(route);
-                                if (inPublicSharing) return setParentId(child.id);
-                              }}
-                              checked={checked[child.id] || false}
-                              onCheck={v =>
-                                setChecked(_.pickBy({ ...checked, [child.id]: v }, _.identity))
-                              }
-                              onBuildContextMenu={() => onBuildContextMenu(details, child)}
-                            />
+                          <Droppable id={index} key={index} data={{ item: child }}>
+                            <Draggable id={index} data={{ item: child }}>
+                              <FolderRow
+                                className={
+                                  (index === 0 ? 'rounded-t-md ' : '-mt-px ') +
+                                  (index === visibleItems.length - 1 ? 'rounded-b-md ' : '') +
+                                  'border-0 md:border'
+                                }
+                                item={child}
+                                onClick={() => {
+                                  const route = RouterServices.generateRouteFromState({
+                                    dirId: child.id,
+                                  });
+                                  history.push(route);
+                                  if (inPublicSharing) return setParentId(child.id);
+                                }}
+                                checked={checked[child.id] || false}
+                                onCheck={v =>
+                                  setChecked(_.pickBy({ ...checked, [child.id]: v }, _.identity))
+                                }
+                                onBuildContextMenu={() => onBuildContextMenu(details, child)}
+                              />
+                            </Draggable>
                           </Droppable>
                         ) : (
                           draggableMarkup(index, child)
                         ),
                       )}
-                    </>
+                      </>
+                    )
                   )}
-                  {false && shouldVirtualize && visibleRange.end < itemsCount && null}
+                  {/* Trailing skeleton: show after loaded items while still loading more */}
+                  {loading && itemsCount > 0 && !paginateItem.lastPage && (
+                    viewMode === 'gallery' ? <GallerySkeleton count={4} /> : <FolderRowSkeleton count={3} />
+                  )}
                   <DragOverlay>
                     {activeIndex ? (
                       <div className="relative">
@@ -1041,7 +1205,6 @@ export default memo(
                       }}
                     />
                   )}
-                  {false && loading && <FolderRowSkeleton />}
                 </div>
               </DndContext>
             </div>
