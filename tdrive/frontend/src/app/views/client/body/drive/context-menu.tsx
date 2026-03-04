@@ -16,7 +16,7 @@ import { DriveApiClient, getPublicLinkToken } from '@features/drive/api-client/a
 import { useDriveActions } from '@features/drive/hooks/use-drive-actions';
 import { getPublicLink } from '@features/drive/hooks/use-drive-item';
 import { useDrivePreview } from '@features/drive/hooks/use-drive-preview';
-import { DriveItemSelectedList, DriveItemSort } from '@features/drive/state/store';
+import { DriveItemSelectedList, DriveItemSort, DriveItemTypeFilter } from '@features/drive/state/store';
 import { DriveItem, DriveItemDetails } from '@features/drive/types';
 import { ToasterService } from '@features/global/services/toaster-service';
 import { copyToClipboard } from '@features/global/utils/CopyClipboard';
@@ -665,15 +665,15 @@ export const useOnBuildFileContextMenu = () => {
 
 export const useOnBuildSortContextMenu = () => {
   const [sortItem, setSortItem] = useRecoilState(DriveItemSort);
-  return useCallback(() => {
-    const menuItems = [
+  const [typeFilter, setTypeFilter] = useRecoilState(DriveItemTypeFilter);
+  return useCallback((isMyDrive?: boolean, showSharedOnly?: boolean, setShowSharedOnly?: (fn: (v: boolean) => boolean) => void) => {
+    const menuItems: any[] = [
       {
         testClassId: 'sorting-by-date',
         type: 'menu',
         text: Languages.t('components.item_context_menu.sorting.by.date'),
         icon: sortItem.by === 'date' ? 'check' : 'sort-check',
         onClick: () => {
-          // keep the old value for sortItem and change the by value
           setSortItem(prevSortItem => {
             const newSortItem = {
               ...prevSortItem,
@@ -743,8 +743,46 @@ export const useOnBuildSortContextMenu = () => {
             return newSortItem;
           });
         },
-      }
+      },
     ];
+    if (isMyDrive && setShowSharedOnly) {
+      menuItems.push(
+        {type:"separator"},
+        {
+          testClassId: 'filter-shared-only',
+          type: 'menu',
+          text: Languages.t('scenes.app.drive.filter_shared', [], 'Fichiers partagés'),
+          icon: showSharedOnly ? 'check' : 'cloud',
+          onClick: () => {
+            setShowSharedOnly((v: boolean) => !v);
+          },
+        },
+      );
+    }
+
+    // Type filter
+    const typeFilters: { key: string; label: string }[] = [
+      { key: '', label: Languages.t('components.item_context_menu.filter.all', [], 'Tous') },
+      { key: 'folder', label: Languages.t('components.item_context_menu.filter.folders', [], 'Dossiers') },
+      { key: 'document', label: Languages.t('components.item_context_menu.filter.documents', [], 'Documents') },
+      { key: 'spreadsheet', label: Languages.t('components.item_context_menu.filter.spreadsheets', [], 'Tableurs') },
+      { key: 'presentation', label: Languages.t('components.item_context_menu.filter.presentations', [], 'Présentations') },
+      { key: 'pdf', label: 'PDF' },
+      { key: 'image', label: Languages.t('components.item_context_menu.filter.images', [], 'Images') },
+      { key: 'video', label: Languages.t('components.item_context_menu.filter.videos', [], 'Vidéos') },
+      { key: 'audio', label: Languages.t('components.item_context_menu.filter.audio', [], 'Audio') },
+    ];
+    menuItems.push({ type: 'separator' });
+    typeFilters.forEach(({ key, label }) => {
+      menuItems.push({
+        testClassId: `filter-type-${key || 'all'}`,
+        type: 'menu',
+        text: label,
+        icon: typeFilter === key ? 'check' : 'filter',
+        onClick: () => setTypeFilter(key as any),
+      });
+    });
+
     return menuItems;
-  }, [sortItem]);
+  }, [sortItem, typeFilter]);
 };

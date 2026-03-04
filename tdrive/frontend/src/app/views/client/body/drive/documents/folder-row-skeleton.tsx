@@ -4,14 +4,74 @@ type Props = {
   count?: number;
 };
 
-export const FolderRowSkeleton = ({ count = 3 }: Props) => {
+const SkeletonRow = ({ index, total }: { index: number; total: number }) => (
+  <div
+    className={
+      'flex flex-row items-center border border-zinc-200 dark:border-zinc-800 px-4 py-3 animate-pulse ' +
+      (index === 0 ? 'rounded-t-md ' : '-mt-px ') +
+      (index === total - 1 ? 'rounded-b-md ' : '') +
+      'border-0 md:border'
+    }
+  >
+    {/* Icon placeholder */}
+    <div className="mr-2 -ml-1 h-5 w-5 rounded bg-zinc-200 dark:bg-zinc-700 shrink-0" />
+    {/* Name placeholder */}
+    <div className="grow">
+      <div
+        className="h-4 rounded bg-zinc-200 dark:bg-zinc-700"
+        style={{ width: `${40 + ((index * 37) % 40)}%` }}
+      />
+    </div>
+    {/* Date placeholder (hidden on mobile) */}
+    <div className="shrink-0 ml-4 mr-12 hidden md:block">
+      <div className="h-3 w-16 rounded bg-zinc-200 dark:bg-zinc-700" />
+    </div>
+    {/* Size placeholder */}
+    <div className="shrink-0 ml-4 mr-4 md:mr-0">
+      <div className="h-3 w-12 rounded bg-zinc-200 dark:bg-zinc-700" />
+    </div>
+    {/* Menu button placeholder */}
+    <div className="shrink-0 ml-4">
+      <div className="h-8 w-8 rounded-full bg-zinc-200 dark:bg-zinc-700" />
+    </div>
+  </div>
+);
+
+export const FolderRowSkeleton = ({ count = 6 }: Props) => {
   return (
-    <div className="flex items-center justify-center py-8">
-      <svg className="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-      </svg>
-      <span className="ml-3 text-gray-600 dark:text-gray-400">Chargement...</span>
+    <div>
+      {Array.from({ length: count }).map((_, i) => (
+        <SkeletonRow key={i} index={i} total={count} />
+      ))}
+    </div>
+  );
+};
+
+const GallerySkeletonCard = ({ index }: { index: number }) => (
+  <div className="animate-pulse rounded-lg border-2 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+    {/* Thumbnail placeholder */}
+    <div
+      className="aspect-square w-full rounded-t-lg bg-zinc-200 dark:bg-zinc-700"
+    />
+    {/* Meta placeholder */}
+    <div className="px-3 py-2 h-[52px]">
+      <div
+        className="h-3.5 rounded bg-zinc-200 dark:bg-zinc-700 mb-1.5"
+        style={{ width: `${50 + ((index * 29) % 40)}%` }}
+      />
+      <div className="h-2.5 w-12 rounded bg-zinc-200 dark:bg-zinc-700" />
+    </div>
+  </div>
+);
+
+export const GallerySkeleton = ({ count = 12 }: Props) => {
+  return (
+    <div className="p-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+        {Array.from({ length: count }).map((_, i) => (
+          <GallerySkeletonCard key={i} index={i} />
+        ))}
+      </div>
     </div>
   );
 };

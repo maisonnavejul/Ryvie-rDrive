@@ -33,6 +33,13 @@ export const DriveItemPagination = atom<BrowsePaginate>({
   },
 });
 
+export type DriveTypeFilter = '' | 'folder' | 'document' | 'spreadsheet' | 'presentation' | 'pdf' | 'image' | 'video' | 'audio';
+
+export const DriveItemTypeFilter = atom<DriveTypeFilter>({
+  key: 'DriveItemTypeFilter',
+  default: '',
+});
+
 // État pour la navigation instantanée
 export const DriveNavigationState = atom<{
   isNavigating: boolean;

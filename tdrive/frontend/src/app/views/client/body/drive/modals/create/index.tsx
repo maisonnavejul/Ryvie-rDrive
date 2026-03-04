@@ -10,11 +10,12 @@ import {
   FolderPlusIcon,
   LinkIcon,
 } from '@heroicons/react/24/outline';
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { atom, useRecoilState } from 'recoil';
 import { slideXTransition, slideXTransitionReverted } from 'src/utils/transitions';
 import { CreateFolder } from './create-folder';
 import { CreateLink } from './create-link';
+import { CreateDocument } from './create-document';
 import Languages from "features/global/services/languages-service";
 import { FileTypeDocumentIcon, FileTypeSlidesIcon, FileTypeSpreadsheetIcon } from 'app/atoms/icons-colored';
 
@@ -22,6 +23,9 @@ export type CreateModalAtomType = {
   open: boolean;
   parent_id: string;
   type?: string;
+  docUrl?: string;
+  docFilename?: string;
+  docTypeName?: string;
 };
 
 export const CreateModalAtom = atom<CreateModalAtomType>({
@@ -133,7 +137,13 @@ export const CreateModal = ({
                       )}
                       text={Languages.t(`${app.emptyFile.name}`)}
                       onClick={() =>
-                        addFromUrl(app.emptyFile.url, app.emptyFile.filename || app.emptyFile.name)
+                        setState({
+                          ...state,
+                          type: 'document',
+                          docUrl: app.emptyFile.url,
+                          docFilename: app.emptyFile.filename || app.emptyFile.name,
+                          docTypeName: app.emptyFile.name,
+                        })
                       }
                       testClassId={app.emptyFile.name.replaceAll(' ' ,'-').toLocaleLowerCase()}
                     />
@@ -164,6 +174,25 @@ export const CreateModal = ({
             {...(!state.type ? slideXTransitionReverted : slideXTransition)}
           >
             <CreateLink />
+          </Transition>
+
+          <Transition
+            style={{
+              gridColumn: '1 / 1',
+              gridRow: '1 / 1',
+            }}
+            show={state.type === 'document'}
+            as="div"
+            {...(!state.type ? slideXTransitionReverted : slideXTransition)}
+          >
+            {state.type === 'document' && state.docUrl && state.docFilename && (
+              <CreateDocument
+                addFromUrl={addFromUrl}
+                url={state.docUrl}
+                defaultFilename={state.docFilename}
+                docTypeName={state.docTypeName || ''}
+              />
+            )}
           </Transition>
         </div>
       </ModalContent>

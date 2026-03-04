@@ -1408,6 +1408,9 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
     fastify.post(`${apiPrefix}/rclone/analyze`, {
       preValidation: fastify.authenticate
     }, async (request: any, reply) => {
+      // Increase timeout to 5 minutes for large cloud analysis
+      request.raw.socket.setTimeout(300000);
+      reply.raw.socket?.setTimeout(300000);
       logger.info('🔍 ANALYZE ENDPOINT CALLED');
       try {
         const { path: cloudPath = '', userEmail, provider = 'dropbox' } = request.body;
@@ -1433,7 +1436,7 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
           : `rclone lsjson --recursive "${remoteName}:${cloudPath}"`;
         logger.info(`📋 Listing files: ${listCommand}`);
         
-        const { stdout } = await execAsync(listCommand);
+        const { stdout } = await execAsync(listCommand, { maxBuffer: 100 * 1024 * 1024, timeout: 300000 });
         const files = JSON.parse(stdout).filter((f: any) => !f.IsDir);
         
         // Extraire tous les dossiers nécessaires
@@ -1469,8 +1472,11 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
           // Filtrer pour ne garder que les fichiers à la racine (pas dans des sous-dossiers)
           const dropboxRootFiles = dropboxAllFiles.filter((f: any) => !f.Path.includes('/'));
           
-          // Calculer la taille des dossiers
-          const foldersWithSize = dropboxFolders.map((folder: any) => {
+          // Séparer dossiers de premier niveau et sous-dossiers
+          const topLevelFolders = dropboxFolders.filter((f: any) => !f.Path.includes('/'));
+          
+          // Calculer la taille des dossiers de premier niveau (inclut fichiers récursifs)
+          const foldersWithSize = topLevelFolders.map((folder: any) => {
             const folderFiles = dropboxAllFiles.filter((f: any) => f.Path.startsWith(folder.Path + '/'));
             const totalSize = folderFiles.reduce((sum: number, f: any) => sum + f.Size, 0);
             return {
@@ -1480,10 +1486,11 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
             };
           });
           
-          logger.info(`📁 DROPBOX FOLDERS (${foldersWithSize.length}):`);
+          logger.info(`📁 ${provider.toUpperCase()} TOP-LEVEL FOLDERS (${foldersWithSize.length}):`);
           foldersWithSize.forEach((folder: any) => {
             logger.info(`  📁 ${folder.name} - ${folder.sizeKB} KB`);
           });
+          logger.info(`📁 Total folders (all levels): ${dropboxFolders.length}`);
           
           logger.info(`📄 DROPBOX FILES (racine uniquement) (${dropboxRootFiles.length}):`);
           dropboxRootFiles.forEach((file: any) => {
@@ -1496,19 +1503,22 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
           if (driveParentId) {
             logger.info('\n🗂️ === MYDRIVE CONTENT ===');
             
-            const companyId = await this.getCompanyId();
-            const userId = await this.getUserId();
+            // Utiliser userId/companyId du frontend (priorité) ou fallback sur request.user / DB
+            const frontendUserId = request.body.userId;
+            const frontendCompanyId = request.body.companyId;
+            const companyId = frontendCompanyId || await this.getCompanyId();
+            const userId = frontendUserId || request.user?.id || await this.getUserId();
             const executionContext = {
               company: { id: companyId },
               user: { 
-                id: request.user?.id || userId,
+                id: userId,
                 email: userEmail,
                 server_request: true,
                 application_id: null
               }
             };
-            logger.info(`🔑 Using company ID: ${executionContext.company.id} (from oldest folder)`);
-            logger.info(`🔑 Using user ID: ${executionContext.user.id} (${request.user?.id ? 'from request' : 'from oldest user folder'})`);
+            logger.info(`🔑 Using company ID: ${executionContext.company.id} (${frontendCompanyId ? 'from frontend' : 'from DB'})`);
+            logger.info(`🔑 Using user ID: ${executionContext.user.id} (${frontendUserId ? 'from frontend' : request.user?.id ? 'from request' : 'from DB'})`);
             
             const browseResult = await globalResolver.services.documents.documents.browse(
               driveParentId,
@@ -1592,13 +1602,22 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
               return false; // Déjà à jour
             });
             
-            logger.info(`\n📊 RÉSULTAT ANALYSE: ${foldersToSync.length}/${foldersWithSize.length} dossiers à sync, ${filesToSync.length}/${dropboxRootFilesFormatted.length} fichiers à sync`);
+            // Compter aussi les fichiers dans les dossiers à synchroniser
+            const folderFilesToSyncCount = foldersToSync.reduce((count: number, folder: any) => {
+              const folderFiles = dropboxAllFiles.filter((f: any) => f.Path.startsWith(folder.path + '/'));
+              return count + folderFiles.length;
+            }, 0);
+            
+            const totalFilesToSync = filesToSync.length + folderFilesToSyncCount;
+            
+            logger.info(`\n📊 RÉSULTAT ANALYSE: ${foldersToSync.length}/${foldersWithSize.length} dossiers à sync, ${filesToSync.length} fichiers racine + ${folderFilesToSyncCount} fichiers dans dossiers = ${totalFilesToSync} fichiers total à sync`);
             
             // Préparer les données pour le frontend
             diagnosticData = {
               dropbox: {
                 folders: foldersWithSize,
-                files: dropboxRootFilesFormatted
+                files: dropboxRootFilesFormatted,
+                totalRecursiveFiles: dropboxAllFiles.length
               },
               myDrive: {
                 folders: myDriveFoldersWithSize,
@@ -1606,16 +1625,17 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
               },
               toSync: {
                 folders: foldersToSync,
-                files: filesToSync
+                files: filesToSync,
+                totalFilesToSync: totalFilesToSync
               }
             };
             
-            // 3. COMPARAISON
-            logger.info('\n🔍 === COMPARISON ANALYSIS ===');
+            // 3. COMPARAISON (premier niveau uniquement)
+            logger.info('\n🔍 === COMPARISON ANALYSIS (TOP-LEVEL ONLY) ===');
             
-            // Comparer les dossiers
-            logger.info('📁 FOLDER COMPARISON:');
-            dropboxFolders.forEach((dbFolder: any) => {
+            // Comparer les dossiers de premier niveau
+            logger.info('📁 FOLDER COMPARISON (top-level):');
+            topLevelFolders.forEach((dbFolder: any) => {
               const matchingFolder = myDriveFolders.find((mdFolder: any) => {
                 const baseName = dbFolder.Name;
                 const pattern = new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(-\\d+)?$`);
@@ -1623,9 +1643,9 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
               });
               
               if (matchingFolder) {
-                logger.info(`  ✅ MATCH: Dropbox "${dbFolder.Name}" <-> MyDrive "${matchingFolder.name}"`);
+                logger.info(`  ✅ MATCH: "${dbFolder.Name}" <-> MyDrive "${matchingFolder.name}"`);
               } else {
-                logger.info(`  ❌ MISSING: Dropbox "${dbFolder.Name}" not found in MyDrive`);
+                logger.info(`  ❌ MISSING: "${dbFolder.Name}" not found in MyDrive`);
               }
             });
             
@@ -1683,9 +1703,12 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
     fastify.post(`${apiPrefix}/rclone/sync`, {
       preValidation: fastify.authenticate
     }, async (request: any, reply) => {
+      // Increase timeout to 10 minutes for large sync operations
+      request.raw.socket.setTimeout(600000);
+      reply.raw.socket?.setTimeout(600000);
       logger.info('🔄 UNIFIED SYNC ENDPOINT CALLED');
       try {
-        const { path: cloudPath = '', userEmail, driveParentId, folderMap = {}, provider = 'dropbox' } = request.body;
+        const { path: cloudPath = '', userEmail, driveParentId, folderMap = {}, provider = 'dropbox', userId: frontendUserId, companyId: frontendCompanyId } = request.body;
         
         if (!userEmail) {
           return reply.status(400).send({ error: 'userEmail is required' });
@@ -1699,13 +1722,15 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
         logger.info(`📂 ${provider.toUpperCase()} path: "${cloudPath}", Drive parent: "${driveParentId}"`);
         logger.info(`📁 Folder map:`, folderMap);
         
-        // Créer le contexte d'exécution avec les IDs dynamiques
-        const companyId = await this.getCompanyId();
-        const userId = await this.getUserId();
+        // Utiliser userId/companyId du frontend (priorité) ou fallback sur request.user / DB
+        const companyId = frontendCompanyId || await this.getCompanyId();
+        const userId = frontendUserId || request.user?.id || await this.getUserId();
+        logger.info(`🔑 Using company ID: ${companyId} (${frontendCompanyId ? 'from frontend' : 'from DB'})`);
+        logger.info(`🔑 Using user ID: ${userId} (${frontendUserId ? 'from frontend' : request.user?.id ? 'from request' : 'from DB'})`);
         const executionContext = {
           company: { id: companyId },
           user: { 
-            id: request.user?.id || userId,
+            id: userId,
             email: userEmail,
             server_request: true,
             application_id: null
@@ -1715,9 +1740,6 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
           reqId: 'rclone-sync',
           transport: 'http' as const,
         };
-        logger.info(`🔑 Using company ID: ${executionContext.company.id} (from oldest folder)`);
-        logger.info(`🔑 Using user ID: ${executionContext.user.id} (${request.user?.id ? 'from request' : 'from oldest user folder'})`);
-        
         this.currentUserEmail = userEmail;
         let remoteName: string;
         
@@ -1731,7 +1753,7 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
         const remotePath = `${remoteName}:${cloudPath}`;
         const listCommand = `rclone lsjson --recursive "${remotePath}"`;
         
-        const { stdout } = await execAsync(listCommand);
+        const { stdout } = await execAsync(listCommand, { maxBuffer: 100 * 1024 * 1024, timeout: 300000 });
         const allCloudItems = JSON.parse(stdout);
         const cloudFolders = allCloudItems.filter((f: any) => f.IsDir);
         const cloudAllFiles = allCloudItems.filter((f: any) => !f.IsDir);
@@ -1739,8 +1761,11 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
         // Filtrer pour ne garder que les fichiers à la racine (pas dans des sous-dossiers)
         const cloudRootFiles = cloudAllFiles.filter((f: any) => !f.Path.includes('/'));
         
-        // Calculer la taille des dossiers
-        const foldersWithSize = cloudFolders.map((folder: any) => {
+        // Séparer dossiers de premier niveau et sous-dossiers
+        const topLevelCloudFolders = cloudFolders.filter((f: any) => !f.Path.includes('/'));
+        
+        // Calculer la taille des dossiers de premier niveau (inclut fichiers récursifs)
+        const foldersWithSize = topLevelCloudFolders.map((folder: any) => {
           const folderFiles = cloudAllFiles.filter((f: any) => f.Path.startsWith(folder.Path + '/'));
           const totalSize = folderFiles.reduce((sum: number, f: any) => sum + f.Size, 0);
           return {
@@ -1749,6 +1774,8 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
             sizeKB: Math.round(totalSize / 1024)
           };
         });
+        
+        logger.info(`📁 TOP-LEVEL CLOUD FOLDERS: ${foldersWithSize.length} (total all levels: ${cloudFolders.length})`);
         
         // 2. LISTER MYDRIVE CONTENT
         const browseResult = await globalResolver.services.documents.documents.browse(
@@ -2235,7 +2262,7 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
         
         logger.info(`📋 Listing ${provider} files: ${listCommand}`);
         
-        const { stdout } = await execAsync(listCommand);
+        const { stdout } = await execAsync(listCommand, { maxBuffer: 100 * 1024 * 1024, timeout: 300000 });
         const allItems = JSON.parse(stdout);
         files = allItems.filter((f: any) => !f.IsDir);
       }
