@@ -165,7 +165,7 @@ services:
   node:
     container_name: app-rdrive-node
     restart: unless-stopped
-    image: julescloud/rdrive-node:v0.0.8
+    image: julescloud/rdrive-node:v0.0.9
     env_file:
       - .env
     ports:
@@ -192,7 +192,7 @@ services:
       - ryvie-network
 
   frontend:
-    image: julescloud/rdrive-frontend:v0.0.7
+    image: julescloud/rdrive-frontend:v0.0.8
     container_name: app-rdrive-frontend
     environment:
       - DEV=production

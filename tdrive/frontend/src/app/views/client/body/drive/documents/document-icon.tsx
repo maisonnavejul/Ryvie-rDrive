@@ -7,6 +7,7 @@ import {
   FileTypePdfIcon,
   FileTypeSlidesIcon,
   FileTypeSpreadsheetIcon,
+  FileTypeTextIcon,
   FileTypeUnknownIcon,
 } from '@atoms/icons-colored';
 import { FolderIcon } from 'app/atoms/icons-colored';
@@ -20,13 +21,14 @@ const FileTypeIcons: { [key: string]: (props: ComponentProps<'svg'>) => JSX.Elem
   archive: FileTypeArchiveIcon,
   pdf: FileTypePdfIcon,
   document: FileTypeDocumentIcon,
+  text: FileTypeTextIcon,
   spreadsheet: FileTypeSpreadsheetIcon,
   slides: FileTypeSlidesIcon,
   link: FileTypeLinkIcon,
 };
 
 const extensionToFileType: { [key: string]: string } = {
-  doc: 'document', docx: 'document', odt: 'document', rtf: 'document', txt: 'document',
+  doc: 'document', docx: 'document', odt: 'document', rtf: 'document', txt: 'text',
   xls: 'spreadsheet', xlsx: 'spreadsheet', ods: 'spreadsheet', csv: 'spreadsheet',
   ppt: 'slides', pptx: 'slides', odp: 'slides',
   pdf: 'pdf',
