@@ -2,6 +2,19 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import svgr from 'vite-plugin-svgr';
 import path from 'path';
+import fs from 'fs';
+
+// Read version from root package.json (local dev: ../package.json, Docker build: /tdrive-root-package.json)
+let APP_VERSION = '0.0.1';
+try {
+  const localPath = path.resolve(__dirname, '../package.json');
+  const dockerPath = '/tdrive-root-package.json';
+  const pkgPath = fs.existsSync(localPath) ? localPath : fs.existsSync(dockerPath) ? dockerPath : null;
+  if (pkgPath) {
+    const rootPkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    APP_VERSION = rootPkg.version || APP_VERSION;
+  }
+} catch { /* fallback to default */ }
 
 export default defineConfig({
   plugins: [
@@ -75,6 +88,9 @@ export default defineConfig({
         },
       },
     },
+  },
+  define: {
+    '__APP_VERSION__': JSON.stringify(APP_VERSION),
   },
   build: {
     outDir: 'build',

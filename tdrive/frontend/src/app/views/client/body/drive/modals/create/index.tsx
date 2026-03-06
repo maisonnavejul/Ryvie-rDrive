@@ -9,6 +9,7 @@ import {
   ChevronLeftIcon,
   FolderPlusIcon,
   LinkIcon,
+  ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
 import { ReactNode, useState } from 'react';
 import { atom, useRecoilState } from 'recoil';
@@ -37,6 +38,8 @@ export const CreateModalAtom = atom<CreateModalAtomType>({
 });
 
 export const CreateModal = ({
+  selectFromDevice,
+  selectFolderFromDevice,
   addFromUrl,
 }: {
   selectFromDevice: () => void;
@@ -83,6 +86,19 @@ export const CreateModal = ({
             {...(!state.type ? slideXTransitionReverted : slideXTransition)}
           >
             <div className="-m-2">
+              <CreateModalOption
+                icon={<ArrowUpTrayIcon className="w-5 h-5" />}
+                text={Languages.t('components.create_modal.upload_files')}
+                onClick={() => { setState({ ...state, open: false }); selectFromDevice(); }}
+                testClassId="create-upload-files-option"
+              />
+              <CreateModalOption
+                icon={<ArrowUpTrayIcon className="w-5 h-5" />}
+                text={Languages.t('components.create_modal.upload_folders')}
+                onClick={() => { setState({ ...state, open: false }); selectFolderFromDevice(); }}
+                testClassId="create-upload-folder-option"
+              />
+              <div className="mx-2 my-1 border-t border-zinc-200 dark:border-zinc-700" />
               <CreateModalOption
                 icon={<FolderPlusIcon className="w-5 h-5" />}
                 text={Languages.t('components.create_modal.create_folder')}

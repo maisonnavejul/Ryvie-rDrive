@@ -1260,7 +1260,7 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
           ? this.getGoogleDriveRemoteName(userEmail)
           : this.getRemoteName(userEmail);
         
-        // Vérifier si le remote existe dans la configuration rclone
+        // 1. Vérifier si le remote existe dans la configuration rclone
         const { exec } = require('child_process');
         const configPath = '/root/.config/rclone/rclone.conf';
         
@@ -1273,16 +1273,62 @@ export default class RcloneService extends TdriveService<RcloneAPI> implements R
             
             // Vérifier si le remote existe dans la liste
             const remotes = stdout.split('\n').map(r => r.trim().replace(':', ''));
-            const isConnected = remotes.includes(remoteName);
+            const remoteExists = remotes.includes(remoteName);
             
-            logger.info(`${isConnected ? '✅' : '❌'} ${provider} remote "${remoteName}" ${isConnected ? 'found' : 'not found'}`);
+            if (!remoteExists) {
+              logger.info(`❌ ${provider} remote "${remoteName}" not found in config`);
+              return resolve(reply.send({ connected: false, provider, remoteName, userEmail }));
+            }
             
-            resolve(reply.send({ 
-              connected: isConnected,
-              provider,
-              remoteName,
-              userEmail
-            }));
+            // 2. Vérifier que le token est encore valide en faisant un appel léger
+            // lsjson avec --max-depth 1 sur la racine, timeout court
+            logger.info(`🔑 Remote "${remoteName}" exists, verifying token validity...`);
+            const testCmd = `rclone lsjson --max-depth 1 "${remoteName}:" --fast-list 2>&1`;
+            exec(testCmd, { timeout: 15000, maxBuffer: 10 * 1024 * 1024 }, (testErr: any, testStdout: string, testStderr: string) => {
+              if (testErr) {
+                const errorOutput = testStderr || testStdout || testErr.message || '';
+                // Détecter les erreurs de token expiré/invalide
+                const isTokenError = errorOutput.includes('token') 
+                  || errorOutput.includes('expired')
+                  || errorOutput.includes('invalid_grant')
+                  || errorOutput.includes('oauth2')
+                  || errorOutput.includes('401')
+                  || errorOutput.includes('403')
+                  || errorOutput.includes('couldn\'t')
+                  || errorOutput.includes('failed to')
+                  || testErr.killed; // timeout = probablement token invalide
+                  
+                if (isTokenError) {
+                  logger.warn(`⚠️ ${provider} token expired/invalid for "${remoteName}": ${errorOutput.substring(0, 200)}`);
+                  return resolve(reply.send({ 
+                    connected: false, 
+                    provider, 
+                    remoteName, 
+                    userEmail,
+                    reason: 'token_expired'
+                  }));
+                }
+                
+                // Autre erreur (réseau, etc.) - on considère comme non connecté
+                logger.error(`❌ ${provider} verification failed: ${errorOutput.substring(0, 200)}`);
+                return resolve(reply.send({ 
+                  connected: false, 
+                  provider, 
+                  remoteName, 
+                  userEmail,
+                  reason: 'verification_failed'
+                }));
+              }
+              
+              // Token valide - la commande a réussi
+              logger.info(`✅ ${provider} token valid for "${remoteName}"`);
+              return resolve(reply.send({ 
+                connected: true,
+                provider,
+                remoteName,
+                userEmail
+              }));
+            });
           });
         });
         

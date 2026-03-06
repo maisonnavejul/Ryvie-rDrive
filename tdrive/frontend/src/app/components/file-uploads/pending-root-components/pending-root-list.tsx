@@ -120,7 +120,7 @@ const PendingRootList = ({
     <>
       {totalRoots > 0 && (
         <div
-          className="fixed bottom-4 right-4 w-full sm:w-1/2 md:w-1/3 max-w-lg shadow-lg rounded-sm overflow-hidden testid:upload-root-modal 
+          className="fixed bottom-4 right-4 z-[9999] w-full sm:w-1/2 md:w-1/3 max-w-lg shadow-lg rounded-sm overflow-hidden testid:upload-root-modal 
                 sm:right-4 sm:left-auto sm:translate-x-0 left-1/2 -translate-x-1/2"
         >
           <ModalHeader

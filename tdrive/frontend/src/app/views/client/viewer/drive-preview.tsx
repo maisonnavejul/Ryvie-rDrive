@@ -111,18 +111,10 @@ export const DrivePreview: React.FC<DrivePreviewProps> = ({ items }) => {
     <Modal
       open={isOpen}
       closable={false}
-      className="bg-black bg-opacity-50 !sm:max-w-none !w-full !rounded-none !p-0 testid:preview-modal"
+      className="!bg-black/40 backdrop-blur-xl !sm:max-w-none !w-full !rounded-none !p-0 testid:preview-modal"
       style={{ maxWidth: 'none', margin: 0, left: 0, top: 0, height: '100vh' }}
       positioned={false}
     >
-      <XMarkIcon
-        className="z-10 cursor-pointer absolute right-5 top-5 w-20 h-20 text-white hover:text-black rounded-full p-1 bg-gray-500 hover:bg-white bg-opacity-25 testid:preview-button-close"
-        onClick={() => {
-          close();
-          // small delay to allow the modal to close
-          history.push(RouterServices.generateRouteFromState({ companyId: company,  itemId: '' }));
-        }}
-      />
 
       <Transition
         show={modalLoading || loadingData}
@@ -139,38 +131,43 @@ export const DrivePreview: React.FC<DrivePreviewProps> = ({ items }) => {
         className="flex flex-col h-full"
         {...fadeTransition}
       >
-        <div className="px-16 py-2 grow relative overflow-hidden">
-          <DriveDisplay />
-        </div>
-        <div className="z-10 p-5 bg-black w-full flex text-white">
-          <div className="grow overflow-hidden text-ellipsis">
-            <Text.Base noColor className="w-full block text-white whitespace-nowrap testid:preview-file-name">
-              {name}
-            </Text.Base>
-            <Text.Info className="whitespace-nowrap testid:preview-file-info">
-              {formatDate(dateAdded)}{' '}
-              • {extension?.toLocaleUpperCase()},{' '}
-              {formatSize(size)}
-            </Text.Info>
+        <div className="z-10 px-4 py-2 bg-black/60 backdrop-blur-md w-full flex items-center gap-3 text-white border-b border-white/10">
+          <Button
+            iconSize="sm"
+            className="shrink-0 !rounded-full !bg-white/10 hover:!bg-white/20"
+            theme="dark"
+            size="sm"
+            icon={XMarkIcon}
+            onClick={() => {
+              close();
+              history.push(RouterServices.generateRouteFromState({ companyId: company, itemId: '' }));
+            }}
+            testClassId="drive-preview-button-close"
+          />
+          <div className="grow overflow-hidden">
+            <p className="text-sm font-medium text-white truncate testid:preview-file-name">{name}</p>
+            <p className="text-xs text-white/50 whitespace-nowrap testid:preview-file-info">
+              {formatDate(dateAdded)} • {extension?.toLocaleUpperCase()}, {formatSize(size)}
+            </p>
           </div>
-          <div className="whitespace-nowrap flex items-center">
+          <div className="shrink-0 flex items-center gap-1">
             <Controls type={type} />
             {items.length > 1 &&
               <>
                 <Button
-                  iconSize="lg"
-                  className="ml-4 !rounded-full"
+                  iconSize="md"
+                  className="!rounded-full !bg-white/10 hover:!bg-white/20"
                   theme="dark"
-                  size="lg"
+                  size="sm"
                   icon={ArrowLeftIcon}
                   onClick={ handleSwitchLeft }
                   testClassId="drive-preview-button-switch-left"
                 />
                 <Button
-                  iconSize="lg"
-                  className="ml-4 !rounded-full"
+                  iconSize="md"
+                  className="!rounded-full !bg-white/10 hover:!bg-white/20"
                   theme="dark"
-                  size="lg"
+                  size="sm"
                   icon={ArrowRightIcon}
                   onClick={ handleSwitchRight }
                   testClassId="drive-preview-button-switch-right"
@@ -178,17 +175,26 @@ export const DrivePreview: React.FC<DrivePreviewProps> = ({ items }) => {
               </>
             }
             <Button
-              iconSize="lg"
-              className="ml-4 !rounded-full"
+              iconSize="md"
+              className="!rounded-full !bg-white/10 hover:!bg-white/20"
               theme="dark"
-              size="lg"
+              size="sm"
               icon={ArrowDownTrayIcon}
-              onClick= {() => {
-                download && (window.location.href = download);
-              }}
+              onClick={() => { download && (window.location.href = download); }}
               testClassId="drive-preview-button-download"
             />
           </div>
+        </div>
+        <div
+          className="grow relative overflow-hidden flex items-center justify-center"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              close();
+              history.push(RouterServices.generateRouteFromState({ companyId: company, itemId: '' }));
+            }
+          }}
+        >
+          <DriveDisplay />
         </div>
       </Transition>
     </Modal>

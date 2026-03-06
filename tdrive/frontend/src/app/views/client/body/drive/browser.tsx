@@ -184,33 +184,6 @@ export default memo(
     // loading is only true before the first successful load for this folder
     const loading = !hasLoadedOnce;
     
-    // Virtualisation légère pour les grandes listes - CHARGEMENT PROGRESSIF
-    const VIRT_PAGE_SIZE = 50; // Réduire pour afficher plus rapidement
-    const VIRT_THRESHOLD = 100; // déclenchement de chargement quand on s'approche du bas
-    const shouldVirtualize = itemsCount > VIRT_PAGE_SIZE;
-    const [visibleRange, setVisibleRange] = useState({
-      start: 0,
-      end: shouldVirtualize ? Math.min(VIRT_PAGE_SIZE, itemsCount) : itemsCount,
-    });
-    
-    // Chargement progressif automatique des items suivants
-    useEffect(() => {
-      if (shouldVirtualize && visibleRange.end < itemsCount) {
-        // Charger automatiquement les items suivants après un court délai
-        const timer = setTimeout(() => {
-          setVisibleRange(v => ({
-            start: 0,
-            end: Math.min(v.end + VIRT_PAGE_SIZE, itemsCount)
-          }));
-        }, 100); // Délai de 100ms entre chaque batch
-        return () => clearTimeout(timer);
-      }
-    }, [visibleRange.end, itemsCount, shouldVirtualize]);
-    
-    // Réinitialiser la fenêtre visible lors d'un changement d'items
-    useEffect(() => {
-      setVisibleRange({ start: 0, end: shouldVirtualize ? Math.min(VIRT_PAGE_SIZE, itemsCount) : itemsCount });
-    }, [itemsCount, shouldVirtualize]);
     
     // Filtre "fichiers partagés" pour Mon Drive
     const [showSharedOnly, setShowSharedOnly] = useState(false);
@@ -247,11 +220,7 @@ export default memo(
     }, []);
 
     const visibleItems = useMemo(() => {
-      const sliced = shouldVirtualize 
-        ? memoizedItems.slice(visibleRange.start, visibleRange.end)
-        : memoizedItems;
-      
-      let filtered = sliced;
+      let filtered = memoizedItems;
       
       // Filtre partagé
       if (showSharedOnly && isMyDrive) {
@@ -264,7 +233,7 @@ export default memo(
       }
       
       return filtered;
-    }, [memoizedItems, visibleRange, shouldVirtualize, showSharedOnly, isMyDrive, typeFilter, matchesTypeFilter]);
+    }, [memoizedItems, showSharedOnly, isMyDrive, typeFilter, matchesTypeFilter]);
 
     const uploadZone = 'drive_' + companyId;
     const uploadZoneRef = useRef<UploadZone | null>(null);
@@ -346,76 +315,126 @@ export default memo(
     );
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-    // Marquee selection state
-    const [isSelecting, setIsSelecting] = useState(false);
-    const [selectOrigin, setSelectOrigin] = useState<{ x: number; y: number } | null>(null);
+    // Marquee selection state — use refs to avoid re-renders during drag
+    const isSelectingRef = useRef(false);
+    const selectOriginRef = useRef<{ x: number; y: number } | null>(null);
+    const rafIdRef = useRef<number>(0);
+    const autoScrollRafRef = useRef<number>(0);
+    const pointerRef = useRef<{ x: number; y: number } | null>(null);
+    const drivePageRef = useRef<HTMLDivElement>(null);
     const [selectRect, setSelectRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
 
-    const updateSelectionFromRect = useCallback((rect: DOMRect) => {
-      const container = scrollViewer.current;
-      if (!container) return;
-      const elements = Array.from(container.querySelectorAll('[id^="DR-"]')) as HTMLElement[];
-      const nextChecked: Record<string, boolean> = {};
-      elements.forEach(el => {
-        const elRect = el.getBoundingClientRect();
-        const intersect = !(rect.right < elRect.left || rect.left > elRect.right || rect.bottom < elRect.top || rect.top > elRect.bottom);
-        if (intersect) {
-          const id = el.id.replace('DR-', '');
-          nextChecked[id] = true;
-        }
-      });
-      setChecked(nextChecked);
-    }, [setChecked]);
-
-    const onMouseDownScroll = useCallback((e: React.MouseEvent) => {
-      if (e.button !== 0) return; // only left click
-      const container = scrollViewer.current;
-      if (!container) return;
-      // start selection when dragging on the background, not on items
-      const target = e.target as HTMLElement;
-      const inItem = target.closest('[id^="DR-"]');
-      if (inItem) return;
-      // Background click: clear current selection immediately
-      setChecked({});
-      const startX = e.clientX;
-      const startY = e.clientY;
-      setIsSelecting(true);
-      setSelectOrigin({ x: startX, y: startY });
-      setSelectRect({ left: startX, top: startY, width: 0, height: 0 });
-      e.preventDefault();
-    }, []);
-
-    const onMouseMoveWindow = useCallback((e: MouseEvent) => {
-      if (!isSelecting || !selectOrigin) return;
-      const x1 = selectOrigin.x;
-      const y1 = selectOrigin.y;
-      const x2 = e.clientX;
-      const y2 = e.clientY;
-      const left = Math.min(x1, x2);
-      const top = Math.min(y1, y2);
-      const width = Math.abs(x2 - x1);
-      const height = Math.abs(y2 - y1);
-      setSelectRect({ left, top, width, height });
-      const rect = new DOMRect(left, top, width, height);
-      updateSelectionFromRect(rect);
-    }, [isSelecting, selectOrigin, updateSelectionFromRect]);
-
-    const onMouseUpWindow = useCallback(() => {
-      if (!isSelecting) return;
-      setIsSelecting(false);
-      setSelectOrigin(null);
-      // keep the final rect briefly (optional), then clear it
-      setTimeout(() => setSelectRect(null), 0);
-    }, [isSelecting]);
 
     useEffect(() => {
-      window.addEventListener('mousemove', onMouseMoveWindow);
-      window.addEventListener('mouseup', onMouseUpWindow);
-      return () => {
-        window.removeEventListener('mousemove', onMouseMoveWindow);
-        window.removeEventListener('mouseup', onMouseUpWindow);
+      const updateSelectionFrame = () => {
+        if (!isSelectingRef.current || !selectOriginRef.current || !pointerRef.current) {
+          rafIdRef.current = 0;
+          return;
+        }
+        const origin = selectOriginRef.current;
+        const pointer = pointerRef.current;
+        const left = Math.min(origin.x, pointer.x);
+        const top = Math.min(origin.y, pointer.y);
+        const width = Math.abs(pointer.x - origin.x);
+        const height = Math.abs(pointer.y - origin.y);
+        setSelectRect({ left, top, width, height });
+        const container = scrollViewer.current;
+        if (!container) {
+          rafIdRef.current = 0;
+          return;
+        }
+        const rect = new DOMRect(left, top, width, height);
+        const elements = container.querySelectorAll('[id^="DR-"]');
+        const nextChecked: Record<string, boolean> = {};
+        for (let i = 0; i < elements.length; i++) {
+          const el = elements[i] as HTMLElement;
+          const elRect = el.getBoundingClientRect();
+          if (!(rect.right < elRect.left || rect.left > elRect.right || rect.bottom < elRect.top || rect.top > elRect.bottom)) {
+            nextChecked[el.id.slice(3)] = true;
+          }
+        }
+        setChecked(nextChecked);
+        rafIdRef.current = 0;
       };
-    }, [onMouseMoveWindow, onMouseUpWindow]);
+
+      const runAutoScroll = () => {
+        if (!isSelectingRef.current || !pointerRef.current) {
+          autoScrollRafRef.current = 0;
+          return;
+        }
+        const container = scrollViewer.current;
+        if (container) {
+          const containerRect = container.getBoundingClientRect();
+          const threshold = 56;
+          const maxSpeed = 22;
+          let delta = 0;
+          if (pointerRef.current.y < containerRect.top + threshold) {
+            const ratio = Math.min(1, (containerRect.top + threshold - pointerRef.current.y) / threshold);
+            delta = -Math.ceil(maxSpeed * ratio);
+          } else if (pointerRef.current.y > containerRect.bottom - threshold) {
+            const ratio = Math.min(1, (pointerRef.current.y - (containerRect.bottom - threshold)) / threshold);
+            delta = Math.ceil(maxSpeed * ratio);
+          }
+          if (delta !== 0) {
+            container.scrollTop += delta;
+            if (!rafIdRef.current) {
+              rafIdRef.current = requestAnimationFrame(updateSelectionFrame);
+            }
+          }
+        }
+        autoScrollRafRef.current = requestAnimationFrame(runAutoScroll);
+      };
+
+      const onMouseMove = (e: MouseEvent) => {
+        if (!isSelectingRef.current || !selectOriginRef.current) return;
+        pointerRef.current = { x: e.clientX, y: e.clientY };
+        if (!rafIdRef.current) {
+          rafIdRef.current = requestAnimationFrame(updateSelectionFrame);
+        }
+        if (!autoScrollRafRef.current) {
+          autoScrollRafRef.current = requestAnimationFrame(runAutoScroll);
+        }
+      };
+      const onMouseUp = () => {
+        if (!isSelectingRef.current) return;
+        isSelectingRef.current = false;
+        selectOriginRef.current = null;
+        pointerRef.current = null;
+        if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+        if (autoScrollRafRef.current) cancelAnimationFrame(autoScrollRafRef.current);
+        rafIdRef.current = 0;
+        autoScrollRafRef.current = 0;
+        setSelectRect(null);
+      };
+      const onWindowMouseDown = (e: MouseEvent) => {
+        if (isMobile) return;
+        if (e.button !== 0) return;
+        const target = e.target as HTMLElement | null;
+        if (!target) return;
+        const drivePage = drivePageRef.current;
+        if (!drivePage || !drivePage.contains(target)) return;
+        const inItem = target.closest('[id^="DR-"]');
+        if (inItem) return;
+        const inInteractive = target.closest('button, input, select, textarea, a, [role="menu"], [role="dialog"], .modal');
+        if (inInteractive) return;
+        setChecked({});
+        isSelectingRef.current = true;
+        selectOriginRef.current = { x: e.clientX, y: e.clientY };
+        pointerRef.current = { x: e.clientX, y: e.clientY };
+        setSelectRect({ left: e.clientX, top: e.clientY, width: 0, height: 0 });
+        e.preventDefault();
+      };
+      window.addEventListener('mousedown', onWindowMouseDown);
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+      return () => {
+        window.removeEventListener('mousedown', onWindowMouseDown);
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+        if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+        if (autoScrollRafRef.current) cancelAnimationFrame(autoScrollRafRef.current);
+      };
+    }, [isMobile, setChecked]);
 
     function getItemFromDndData(data: any): any {
       // Support explicit item field (new) or child.props.item (legacy)
@@ -496,53 +515,8 @@ export default memo(
       );
     }
 
-    // Infinite scroll
+    // Scroll container ref
     const scrollViewer = useRef<HTMLDivElement>(null);
-    const isLoadingNextPage = useRef(false);
-
-    const handleScroll = async () => {
-      const el = scrollViewer.current;
-      if (!el || isLoadingNextPage.current) return;
-      const { scrollTop, scrollHeight, clientHeight } = el;
-      const nearBottom = scrollTop + clientHeight + VIRT_THRESHOLD >= scrollHeight;
-
-      // Étendre la fenêtre visible côté client pour grandes listes
-      if (shouldVirtualize && nearBottom && visibleRange.end < itemsCount) {
-        setVisibleRange((v: { start: number; end: number }) => ({ start: 0, end: Math.min(v.end + VIRT_PAGE_SIZE, itemsCount) }));
-      }
-
-      // Charger la page suivante quand on approche du bas
-      if (nearBottom && !paginateItem.lastPage) {
-        isLoadingNextPage.current = true;
-        try {
-          await loadNextPage(parentId);
-        } finally {
-          isLoadingNextPage.current = false;
-        }
-      }
-    };
-
-    useEffect(() => {
-      if (!loading)
-        scrollViewer.current?.addEventListener('scroll', handleScroll, { passive: true });
-      return () => {
-        scrollViewer.current?.removeEventListener('scroll', handleScroll);
-      };
-    }, [parentId, loading, paginateItem.lastPage]);
-
-    // Auto-load next page when content doesn't fill the scroll area (no scrollbar)
-    useEffect(() => {
-      if (loading || paginateItem.lastPage || isLoadingNextPage.current) return;
-      const el = scrollViewer.current;
-      if (!el) return;
-      const timer = setTimeout(() => {
-        if (el.scrollHeight <= el.clientHeight && !paginateItem.lastPage) {
-          isLoadingNextPage.current = true;
-          loadNextPage(parentId).finally(() => { isLoadingNextPage.current = false; });
-        }
-      }, 200);
-      return () => clearTimeout(timer);
-    }, [loading, itemsCount, paginateItem.lastPage, parentId]);
 
     // Scroll to item in view
     const scrollTillItemInView = itemId && itemId?.length > 0;
@@ -564,35 +538,6 @@ export default memo(
       }
     }, [loading, children]);
 
-    // Determine the number of items that can fit within the scroll viewer's visible area before the scrollbar appears.
-    const getItemsPerPage = useCallback(() => {
-      const scrollViewerElement = scrollViewer?.current || null;
-      const itemHeight = scrollViewerElement?.firstElementChild?.clientHeight || 0;
-      const viewerHeight = scrollViewerElement?.clientHeight || 0;
-      return itemHeight > 0 ? Math.ceil(viewerHeight / itemHeight) : 0;
-    }, []);
-
-    const [itemsPerPage, setItemsPerPage] = useState(0);
-
-    const handleResize = useCallback(() => {
-      setItemsPerPage(getItemsPerPage());
-    }, [getItemsPerPage]);
-
-    useEffect(() => {
-      handleResize(); // intially set the items per page for the current view
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
-    }, [handleResize]);
-
-    // Load additional pages as needed to ensure the scrollbar remains visible
-    useEffect(() => {
-      const currentPage = Math.floor((paginateItem?.page || 1) / (paginateItem?.limit || 1));
-      const targetPages = Math.ceil(itemsPerPage / (paginateItem?.limit || 1));
-
-      if (!loading && currentPage < targetPages) {
-        loadNextPage(parentId);
-      }
-    }, [paginateItem, loading, parentId, itemsPerPage]);
 
     const [isPreparingUpload, setIsPreparingUpload] = useState(false);
     
@@ -775,6 +720,7 @@ export default memo(
       }
     }, [openOnlyOfficeEditor, openPreview, history, companyId]);
 
+
     return (
       <>
         {viewId == 'shared-with-me' ? (
@@ -785,6 +731,7 @@ export default memo(
             <SharedFilesTable />
           </>
         ) : (
+          <div ref={drivePageRef} className="h-full">
           <UploadZone
             overClassName={''}
             className="h-full overflow-hidden"
@@ -840,7 +787,7 @@ export default memo(
                       <div className="">
                         <Button
                           theme="secondary"
-                          className="flex items-center"
+                          className="flex items-center border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 !text-zinc-700 dark:!text-zinc-200 hover:!bg-zinc-50 dark:hover:!bg-zinc-800 px-3 py-2 rounded-lg shadow-sm"
                           onClick={evt => {
                             MenusManager.openMenu(
                               buildFileTypeContextMenu(),
@@ -863,7 +810,7 @@ export default memo(
                       <div className="flex items-center space-x-2">
                         <Button
                           theme="secondary"
-                          className="flex items-center"
+                          className="flex items-center border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 !text-zinc-700 dark:!text-zinc-200 hover:!bg-zinc-50 dark:hover:!bg-zinc-800 px-3 py-2 rounded-lg shadow-sm"
                           onClick={evt => {
                             MenusManager.openMenu(
                               buildPeopleContextMen(),
@@ -883,7 +830,7 @@ export default memo(
                       <div className="flex items-center space-x-2">
                         <Button
                           theme="secondary"
-                          className="flex items-center"
+                          className="flex items-center border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 !text-zinc-700 dark:!text-zinc-200 hover:!bg-zinc-50 dark:hover:!bg-zinc-800 px-3 py-2 rounded-lg shadow-sm"
                           onClick={evt => {
                             MenusManager.openMenu(
                               buildDateContextMenu(),
@@ -971,7 +918,7 @@ export default memo(
                   <>
                     <Button
                       theme={'secondary'}
-                      className="ml-2 flex flex-row items-center border-0 md:border !text-gray-500 md:!text-blue-600 px-2 md:px-3"
+                      className="ml-2 flex flex-row items-center border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 !text-zinc-700 dark:!text-zinc-200 hover:!bg-zinc-50 dark:hover:!bg-zinc-800 px-2 md:px-3 shadow-sm"
                       onClick={() => {
                         if (selectedCount === 1) {
                           const item = selectedItems[0];
@@ -992,7 +939,7 @@ export default memo(
 
                     <Button
                       theme={'secondary'}
-                      className="ml-2 flex flex-row items-center border-0 md:border !text-gray-500 md:!text-red-600 px-2 md:px-3"
+                      className="ml-2 flex flex-row items-center border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-950/30 px-2 md:px-3 shadow-sm"
                       disabled={access !== 'manage'}
                       onClick={() => {
                         if (inTrash) {
@@ -1010,7 +957,7 @@ export default memo(
                     <Menu menu={() => onBuildContextMenu(details, selectedCount === 1 ? selectedItems[0] : undefined)} testClassId="browser-menu-bulk-actions">
                       <Button
                         theme="secondary"
-                        className="ml-2 flex flex-row items-center bg-transparent md:bg-blue-500 md:bg-opacity-25 !text-gray-500 md:!text-blue-500 px-2 md:px-3"
+                        className="ml-2 flex flex-row items-center border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 !text-zinc-700 dark:!text-zinc-200 hover:!bg-zinc-50 dark:hover:!bg-zinc-800 px-2 md:px-3 shadow-sm"
                         testClassId="button-bulk-actions"
                       >
                         <EllipsisVerticalIcon className="h-5 w-5" />
@@ -1060,7 +1007,7 @@ export default memo(
                     {' '}
                     <Button
                       theme="secondary"
-                      className="ml-4 flex flex-row items-center bg-transparent md:bg-blue-500 md:bg-opacity-25 !text-gray-500 md:!text-blue-500 px-0 md:px-4"
+                      className="ml-4 flex flex-row items-center border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 !text-zinc-700 dark:!text-zinc-200 hover:!bg-zinc-50 dark:hover:!bg-zinc-800 px-3 md:px-4 shadow-sm"
                       testClassId="button-more"
                     >
                       <span>
@@ -1076,7 +1023,7 @@ export default memo(
               </div>
 
               <DndContext sensors={sensors} onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
-                <div className="grow overflow-auto relative" ref={scrollViewer} onMouseDown={onMouseDownScroll}>
+                <div className="grow overflow-auto relative" ref={scrollViewer}>
                   {/* Skeleton pendant le chargement initial (adapté au mode d'affichage) */}
                   {loading && itemsCount === 0 && !hasLoadedOnce && (
                     viewMode === 'gallery' ? <GallerySkeleton /> : <FolderRowSkeleton />
@@ -1164,10 +1111,6 @@ export default memo(
                       </>
                     )
                   )}
-                  {/* Trailing skeleton: show after loaded items while still loading more */}
-                  {loading && itemsCount > 0 && !paginateItem.lastPage && (
-                    viewMode === 'gallery' ? <GallerySkeleton count={4} /> : <FolderRowSkeleton count={3} />
-                  )}
                   <DragOverlay>
                     {activeIndex ? (
                       <div className="relative">
@@ -1209,6 +1152,7 @@ export default memo(
               </DndContext>
             </div>
           </UploadZone>
+          </div>
         )}
       </>
     );
