@@ -4,6 +4,7 @@ import { ReactComponent as DismissSvg } from './assets/dismiss.svg';
 import { ReactComponent as NotFoundSvg } from './assets/not-found.svg';
 import { ReactComponent as FileTypeArchiveSvg } from './assets/file-type-archive.svg';
 import { ReactComponent as FileTypeDocumentSvg } from './assets/file-type-document.svg';
+import { ReactComponent as FileTypeTextSvg } from './assets/file-type-text.svg';
 import { ReactComponent as FileTypePdfSvg } from './assets/file-type-pdf.svg';
 import { ReactComponent as FileTypeSpreadsheetSvg } from './assets/file-type-spreadsheet.svg';
 import { ReactComponent as FileTypeUnknownSvg } from './assets/file-type-unknown.svg';
@@ -29,6 +30,9 @@ export const FileTypeArchiveIcon = (props: ComponentProps<'svg'>) => (
 export const FileTypePdfIcon = (props: ComponentProps<'svg'>) => <FileTypePdfSvg {...props} />;
 export const FileTypeDocumentIcon = (props: ComponentProps<'svg'>) => (
   <FileTypeDocumentSvg {...props} />
+);
+export const FileTypeTextIcon = (props: ComponentProps<'svg'>) => (
+  <FileTypeTextSvg {...props} />
 );
 export const FileTypeSpreadsheetIcon = (props: ComponentProps<'svg'>) => (
   <FileTypeSpreadsheetSvg {...props} />
