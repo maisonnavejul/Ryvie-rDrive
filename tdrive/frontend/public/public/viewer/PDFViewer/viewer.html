@@ -434,7 +434,7 @@
 
   </div> <!-- outerContainer -->
   <div id="printContainer"></div>
-  <div id="loader" style="display: block;">Loading...</div>
+  <div id="loader" style="display: block;"></div>
 
   <script type="application/javascript">
 
@@ -613,6 +613,21 @@
   	}
       
     openPdf(getUrlParameter("link"), getUrlParameter("name"));
+
+    // Listen for zoom commands from parent window
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type === 'zoomIn') {
+        document.getElementById('zoomIn')?.click();
+      } else if (event.data && event.data.type === 'zoomOut') {
+        document.getElementById('zoomOut')?.click();
+      } else if (event.data && event.data.type === 'resetZoom') {
+        var scaleSelect = document.getElementById('scaleSelect');
+        if (scaleSelect) {
+          scaleSelect.value = 'auto';
+          scaleSelect.dispatchEvent(new Event('change'));
+        }
+      }
+    });
 
   </script>
 </body>

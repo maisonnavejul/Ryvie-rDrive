@@ -47,7 +47,7 @@ export const FolderRowSkeleton = ({ count = 6 }: Props) => {
   );
 };
 
-const GallerySkeletonCard = ({ index }: { index: number }) => (
+export const GallerySkeletonCard = ({ index }: { index: number }) => (
   <div className="animate-pulse rounded-lg border-2 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
     {/* Thumbnail placeholder */}
     <div

@@ -1,4 +1,5 @@
 {
+  "version": "0.0.4",
   "dependencies": {
     "@dnd-kit/core": "^6.0.8",
     "react": "^18.2.0",

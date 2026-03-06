@@ -111,7 +111,6 @@ export default () => {
         setVerifyingDropbox(true);
         try {
           console.log('🔍 Vérification arrière-plan Dropbox...');
-          // Utiliser le nouvel endpoint léger (Phase 2)
           const dropboxResponse = await fetch(`/api/v1/files/rclone/status?provider=dropbox&userEmail=${userEmail}`, {
             headers: {
               'Authorization': JWTStorage.getAutorizationHeader(),
@@ -126,17 +125,19 @@ export default () => {
               setDropboxConnected(true);
               localStorage.setItem('dropbox_connected', 'true');
             } else {
-              console.warn('⚠️ Dropbox non connecté selon le backend');
+              console.warn(`⚠️ Dropbox non connecté: ${data.reason || 'unknown'}`);
               setDropboxConnected(false);
               localStorage.removeItem('dropbox_connected');
             }
           } else {
-            console.warn('⚠️ Dropbox vérification échouée, on garde le cache');
-            // On garde l'état du localStorage en cas d'erreur temporaire
+            console.warn('⚠️ Dropbox vérification échouée (HTTP error), déconnexion');
+            setDropboxConnected(false);
+            localStorage.removeItem('dropbox_connected');
           }
         } catch (error) {
           console.error('❌ Erreur vérification Dropbox:', error);
-          // On garde l'état du localStorage en cas d'erreur réseau
+          setDropboxConnected(false);
+          localStorage.removeItem('dropbox_connected');
         } finally {
           setVerifyingDropbox(false);
         }
@@ -161,15 +162,19 @@ export default () => {
               setGoogleDriveConnected(true);
               localStorage.setItem('googledrive_connected', 'true');
             } else {
-              console.warn('⚠️ Google Drive non connecté selon le backend');
+              console.warn(`⚠️ Google Drive non connecté: ${data.reason || 'unknown'}`);
               setGoogleDriveConnected(false);
               localStorage.removeItem('googledrive_connected');
             }
           } else {
-            console.warn('⚠️ Google Drive vérification échouée, on garde le cache');
+            console.warn('⚠️ Google Drive vérification échouée (HTTP error), déconnexion');
+            setGoogleDriveConnected(false);
+            localStorage.removeItem('googledrive_connected');
           }
         } catch (error) {
           console.error('❌ Erreur vérification Google Drive:', error);
+          setGoogleDriveConnected(false);
+          localStorage.removeItem('googledrive_connected');
         } finally {
           setVerifyingGoogleDrive(false);
         }

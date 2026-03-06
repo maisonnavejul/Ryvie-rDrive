@@ -66,6 +66,7 @@ export type DriveItem = {
   size: number;
   scope: string;
   av_status: string;
+  creator?: string;
 };
 
 export type DriveFileAccessLevelForInherited = 'none' | 'manage';

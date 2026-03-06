@@ -10,6 +10,9 @@ WORKDIR /tdrive-react
 COPY frontend/package.json frontend/pnpm-lock.yaml frontend/.npmrc ./
 RUN pnpm install --frozen-lockfile
 
+# Copier le package.json racine (pour lire la version dans vite.config.ts)
+COPY package.json /tdrive-root-package.json
+
 # Copier les fichiers de config nécessaires pour le build Vite
 COPY frontend/tsconfig*.json frontend/vite.config.ts frontend/tailwind.config.js frontend/postcss.config.js ./
 COPY frontend/index.html ./index.html
