@@ -145,7 +145,7 @@
     "deep-object-diff": "^1.1.0",
     "emoji-name-map": "^1.2.9",
     "eta": "^2.2.0",
-    "fastify": "^5.8.4",
+    "fastify": "^5.8.5",
     "fastify-cors": "^4.1.0",
     "fastify-plugin": "^4.5.1",
     "fastify-socket.io": "^4.0.0",
