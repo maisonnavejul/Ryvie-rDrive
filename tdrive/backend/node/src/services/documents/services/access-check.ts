@@ -198,6 +198,9 @@ export const getAccessLevel = async (
     if (id === "root") {
       if (isAdmin) return "manage";
 
+      // Les membres de la company peuvent créer dans le Drive partagé
+      if (!(await isCompanyGuest(context))) return "write";
+
       return "read";
     }
 
@@ -226,6 +229,16 @@ export const getAccessLevel = async (
     }
 
     if (item.scope === "personal" && item.creator == context.user.id) return "manage";
+
+    // Check shared_drive entity BEFORE generic scope fallback
+    // Items in the Shared Drive have a folder:shared_drive entity that grants
+    // the proper access level (e.g. "manage") to all non-guest company members.
+    const sharedDriveEntityEarly = (item.access_info?.entities || []).find(
+      a => a.type === "folder" && a.id === "shared_drive",
+    );
+    if (sharedDriveEntityEarly && !(await isCompanyGuest(context))) {
+      return sharedDriveEntityEarly.level;
+    }
 
     if (item.scope === "shared") {
       if (isAdmin) return "manage";

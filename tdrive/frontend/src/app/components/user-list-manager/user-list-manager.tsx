@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Col, Row, Typography } from 'antd';
 import classNames from 'classnames';
-import TrashIcon from '@material-ui/icons/DeleteOutlined';
+import TrashIcon from '@mui/icons-material/DeleteOutlined';
 
 import Strings from '@features/global/utils/strings';
 import UsersService from '@features/users/services/current-user-service';

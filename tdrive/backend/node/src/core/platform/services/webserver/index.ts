@@ -10,7 +10,8 @@ import { serverErrorHandler } from "./error";
 import WebServerAPI from "./provider";
 import jwtPlugin from "../auth/web/jwt";
 import path from "path";
-import swaggerPlugin, { FastifySwaggerOptions } from "@fastify/swagger";
+import swaggerPlugin from "@fastify/swagger";
+import swaggerUiPlugin from "@fastify/swagger-ui";
 import { SkipCLI } from "../../framework/decorators/skip";
 import fs from "fs";
 import { ExecutionContext, executionStorage } from "../../framework/execution-storage";
@@ -60,7 +61,7 @@ export default class WebServerService extends TdriveService<WebServerAPI> implem
 
     this.server.addHook("preValidation", (request, reply, done) => {
       if (reply.statusCode === 500) {
-        logger.error("An error occured with the preValidation of ", request.routerPath);
+        logger.error("An error occured with the preValidation of ", request.routeOptions?.url || request.url);
       }
       done();
     });
@@ -68,7 +69,7 @@ export default class WebServerService extends TdriveService<WebServerAPI> implem
     this.server.addHook("preHandler", (request, reply, done) => {
       reply.header("Cache-Control", "no-cache");
       if (reply.statusCode === 500) {
-        logger.error("An error occured with the preHandler of ", request.routerPath);
+        logger.error("An error occured with the preHandler of ", request.routeOptions?.url || request.url);
       }
       done();
     });
@@ -77,7 +78,6 @@ export default class WebServerService extends TdriveService<WebServerAPI> implem
     // DIRTY HACK: THis needs to be registered here to avoid circular dep between auth and user.
     // will have to create a core service for this, or another service which must be started first...
     this.server.register(swaggerPlugin, {
-      routePrefix: "/internal/docs",
       swagger: {
         info: {
           title: "Tdrive Swagger",
@@ -96,14 +96,16 @@ export default class WebServerService extends TdriveService<WebServerAPI> implem
         definitions: {},
         securityDefinitions: {},
       },
+    });
+    this.server.register(swaggerUiPlugin, {
+      routePrefix: "/internal/docs",
       uiConfig: {
         docExpansion: "full",
         deepLinking: false,
       },
       staticCSP: false,
       transformStaticCSP: header => header,
-      exposeRoute: true,
-    } as FastifyRegisterOptions<FastifySwaggerOptions>);
+    });
     this.server.register(jwtPlugin);
     this.server.register(sensible, {
       errorHandler: false,

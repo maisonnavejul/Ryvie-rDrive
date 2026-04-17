@@ -163,11 +163,15 @@ export default class Api {
             return;
           }
           let response: any = '';
-          try {
-            response = JSON.parse(resp);
-          } catch (e) {
-            console.log('Server internal error, bad JSON.');
-            response = { errors: 'bad_json' };
+          if (resp === '' || resp === null || resp === undefined) {
+            response = {};
+          } else {
+            try {
+              response = JSON.parse(resp);
+            } catch (e) {
+              console.log('Server internal error, bad JSON.');
+              response = { errors: 'bad_json' };
+            }
           }
           resolve(response);
           if (callback) callback(response);

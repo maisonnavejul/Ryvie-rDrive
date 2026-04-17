@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { getConfig } from "../../../framework/api/admin";
 import gr from "../../../../../services/global-resolver";
 import { CrudException } from "../../../framework/api/crud-service";
@@ -15,7 +15,7 @@ function authenticateAdminQuery(request: FastifyRequest, reply: FastifyReply) {
   return true;
 }
 
-const routes: FastifyPluginCallback = async (fastify: FastifyInstance, _opts, next) => {
+const routes: FastifyPluginAsync = async (fastify: FastifyInstance, _opts) => {
   const urlRoot = "/api/user/update";
   const config = getConfig();
   if (config?.endpointSecret?.length) {
@@ -31,7 +31,6 @@ const routes: FastifyPluginCallback = async (fastify: FastifyInstance, _opts, ne
       }
     });
   }
-  next();
 };
 
 export default routes;

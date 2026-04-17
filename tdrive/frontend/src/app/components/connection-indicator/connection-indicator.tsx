@@ -1,8 +1,8 @@
 import React from 'react';
 import './connection-indicator.scss';
-import ErrorOutlinedIcon from '@material-ui/icons/ErrorOutlined';
-import HourglassEmpty from '@material-ui/icons/HourglassEmpty';
-import CheckCircleIcon from '@material-ui/icons/CheckCircle';
+import ErrorOutlinedIcon from '@mui/icons-material/ErrorOutlined';
+import HourglassEmpty from '@mui/icons-material/HourglassEmpty';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import Languages from '@features/global/services/languages-service';
 import { ConnectedState } from '@features/users/state/atoms/connected';
 import { useRecoilState } from 'recoil';

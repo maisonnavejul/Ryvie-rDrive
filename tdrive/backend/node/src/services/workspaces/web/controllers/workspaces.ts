@@ -316,7 +316,7 @@ function getExecutionContext(
     user: request.currentUser,
     company_id: request.params.company_id,
     url: request.url,
-    method: request.routeOptions.method,
+    method: request.routeOptions.method as string,
     transport: "http",
   };
 }

@@ -114,7 +114,7 @@ function getExecutionContext(request: FastifyRequest): ExecutionContext {
   return {
     user: request.currentUser,
     url: request.url,
-    method: request.routeOptions.method,
+    method: request.routeOptions.method as string,
     transport: "http",
   };
 }

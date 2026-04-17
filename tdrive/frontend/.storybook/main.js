@@ -4,10 +4,7 @@ import { dirname, join } from 'path';
 const config = {
   stories: ['../src/app/**/*.stories.tsx'],
   addons: [
-    getAbsolutePath('@storybook/addon-links'),
-    getAbsolutePath('@storybook/addon-essentials'),
-    getAbsolutePath('@storybook/addon-interactions'),
-    getAbsolutePath('storybook-dark-mode'),
+    getAbsolutePath('@vueless/storybook-dark-mode'),
   ],
   framework: {
     name: getAbsolutePath('@storybook/react-vite'),
