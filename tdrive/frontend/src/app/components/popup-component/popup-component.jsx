@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import './popup-component.scss';
 import popupManager from '@deprecated/popupManager/popupManager.js';
-import CloseIcon from '@material-ui/icons/CloseOutlined';
+import CloseIcon from '@mui/icons-material/CloseOutlined';
 
 export default class PopupComponent extends React.Component {
   constructor(props) {
