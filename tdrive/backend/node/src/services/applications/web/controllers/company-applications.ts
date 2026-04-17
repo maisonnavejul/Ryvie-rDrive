@@ -67,7 +67,7 @@ function getCompanyExecutionContext(
     user: request.currentUser,
     company: { id: request.params.company_id },
     url: request.url,
-    method: request.routeOptions.method,
+    method: request.routeOptions.method as string,
     reqId: request.id,
     transport: "http",
   };
