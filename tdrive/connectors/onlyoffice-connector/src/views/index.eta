@@ -41,6 +41,35 @@
       }
       updateTitle(doc.title);
 
+      // Track connection state for reconnection
+      window._ooConnectionLost = false;
+      window._ooLastError = null;
+
+      function showReconnectBanner() {
+        if (document.getElementById('oo-reconnect-banner')) return;
+        var banner = document.createElement('div');
+        banner.id = 'oo-reconnect-banner';
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#ef4444;color:#fff;text-align:center;padding:12px 16px;font-family:system-ui,sans-serif;font-size:14px;display:flex;align-items:center;justify-content:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.2)';
+        banner.innerHTML = '<span>⚠️ La connexion au document a été perdue.</span><button id="oo-reload-btn" style="background:#fff;color:#ef4444;border:none;padding:6px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:14px">Recharger</button>';
+        document.body.appendChild(banner);
+        document.getElementById('oo-reload-btn').addEventListener('click', function() {
+          window.location.reload();
+        });
+      }
+
+      function removeReconnectBanner() {
+        var banner = document.getElementById('oo-reconnect-banner');
+        if (banner) banner.remove();
+      }
+
+      // Detect when user returns to the tab after being away
+      document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible' && window._ooConnectionLost) {
+          // Connection was lost while away — auto reload
+          window.location.reload();
+        }
+      });
+
       window.docEditor = new DocsAPI.DocEditor('onlyoffice_container_instance', {
         scrollSensitivity: window.mode === 'text' ? 100 : 40,
         width: '100%',
@@ -65,6 +94,20 @@
             const { title } = event.data;
             if (title) updateTitle(title);
           },
+          onError: function (event) {
+            console.error('OnlyOffice error:', event.data);
+            window._ooConnectionLost = true;
+            window._ooLastError = event.data;
+            showReconnectBanner();
+          },
+          onWarning: function (event) {
+            console.warn('OnlyOffice warning:', event.data);
+            // errorCode -80 = connection lost
+            if (event.data && event.data.warningCode === -80) {
+              window._ooConnectionLost = true;
+              showReconnectBanner();
+            }
+          },
         },
         editorConfig: {
           callbackUrl: `${window.baseURL}callback${callbackQueryString}`,
@@ -78,6 +121,7 @@
             compactToolbar: false,
             about: false,
             feedback: false,
+            forcesave: true,
             goback: {
               text: '',
               blank: false,

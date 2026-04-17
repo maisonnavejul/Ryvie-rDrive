@@ -116,8 +116,9 @@ export default () => {
   const isInSharedDrive = viewId === 'root' || parentId === 'root';
   const isInSharedWithMe = viewId === 'shared_with_me';
   const isInMyDrive = viewId?.startsWith('user_') || parentId?.startsWith('user_');
-  const shouldHideCreateButton = isInSharedDrive || isInSharedWithMe || inTrash;
-  const shouldHideUploadButton = !isInMyDrive || isInCloudProvider;
+  // Permettre la création dans le Drive partagé et dans les dossiers partagés avec moi
+  const shouldHideCreateButton = isInSharedWithMe || inTrash;
+  const shouldHideUploadButton = isInCloudProvider || isInSharedWithMe || inTrash;
 
   const setConfirmDeleteModalState = useSetRecoilState(ConfirmDeleteModalAtom);
   const setCreationModalState = useSetRecoilState(CreateModalAtom);
@@ -131,10 +132,13 @@ export default () => {
       setTimeout(() => {
         setCreationModalState({ open: true, parent_id: 'user_'+user?.id });
       }, 100);
+    } else if (isInSharedDrive) {
+      // Dans le Drive partagé, créer directement à la racine partagée
+      setCreationModalState({ open: true, parent_id: parentId || 'root' });
     } else if (item?.id) {
       setCreationModalState({ open: true, parent_id: item.id });
     }
-  }, [item?.id, isInCloudProvider, user?.id, companyId, history, setCreationModalState]);
+  }, [item?.id, isInCloudProvider, isInSharedDrive, parentId, user?.id, companyId, history, setCreationModalState]);
 
   const uploadItemModal = useCallback(() => {
     // Si on est dans Dropbox/Google Drive, rediriger vers Mon drive
@@ -144,10 +148,13 @@ export default () => {
       setTimeout(() => {
         setUploadModalState({ open: true, parent_id: 'user_'+user?.id });
       }, 100);
+    } else if (isInSharedDrive) {
+      // Dans le Drive partagé, uploader directement à la racine partagée
+      setUploadModalState({ open: true, parent_id: parentId || 'root' });
     } else if (item?.id) {
       setUploadModalState({ open: true, parent_id: item.id });
     }
-  }, [item?.id, isInCloudProvider, user?.id, companyId, history, setUploadModalState]);
+  }, [item?.id, isInCloudProvider, isInSharedDrive, parentId, user?.id, companyId, history, setUploadModalState]);
 
   return (
     <div className="-m-4 overflow-hidden testid:sidebar-actions">

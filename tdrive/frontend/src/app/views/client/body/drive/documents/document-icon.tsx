@@ -47,8 +47,11 @@ export const DocumentIcon = (props: {
   let fileType = props.fileType || fileUploadApiClient.mimeToType(
     props.item?.last_version_cache?.file_metadata?.mime || '',
   );
-  if (fileType === 'other' && props.item?.extension) {
-    fileType = extensionToFileType[props.item.extension.toLowerCase()] || fileType;
+  if (props.item?.extension) {
+    const extType = extensionToFileType[props.item.extension.toLowerCase()];
+    if (extType && (fileType === 'other' || extType !== fileType)) {
+      fileType = extType;
+    }
   }
   const metadata = (props.item?.last_version_cache?.file_metadata || {}) as FileMetadata;
   const className = props.className || 'h-5 w-5 shrink-0 text-gray-400';

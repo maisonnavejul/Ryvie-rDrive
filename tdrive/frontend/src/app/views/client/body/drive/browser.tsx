@@ -8,7 +8,7 @@ import { setTdriveTabToken, DriveApiClient } from '@features/drive/api-client/ap
 import { useDriveItem } from '@features/drive/hooks/use-drive-item';
 import { useDriveUpload } from '@features/drive/hooks/use-drive-upload';
 import { useDrivePrefetch } from '@features/drive/hooks/use-drive-prefetch';
-import { DriveItemSelectedList, DriveItemSort, DriveNavigationState, DriveItemTypeFilter, DriveTypeFilter } from '@features/drive/state/store';
+import { DriveItemSelectedList, DriveItemSort, DriveNavigationState } from '@features/drive/state/store';
 import { formatBytes } from '@features/drive/utils';
 import useRouterCompany from '@features/router/hooks/use-router-company';
 import useRouterWorkspace from '@features/router/hooks/use-router-workspace';
@@ -188,35 +188,41 @@ export default memo(
     // Filtre "fichiers partagés" pour Mon Drive
     const [showSharedOnly, setShowSharedOnly] = useState(false);
     const isMyDrive = viewId?.startsWith('user_') || parentId?.startsWith('user_');
-    const [typeFilter] = useRecoilState(DriveItemTypeFilter);
 
-    // Helper pour matcher un item selon le filtre de type
-    const matchesTypeFilter = useCallback((item: any, filter: DriveTypeFilter): boolean => {
-      if (!filter) return true;
-      if (filter === 'folder') return item.is_directory;
-      if (item.is_directory) return false; // Les autres filtres excluent les dossiers
-      
+    // Helper: get sort category + extension for sort-by-type
+    // Lower number = appears first. Order: Folders > Word > Excel > PowerPoint > PDF > txt/plain > audio > video > archives > other > images
+    const getTypeSortKey = useCallback((item: any): { category: number; ext: string } => {
+      if (item.is_directory) return { category: 0, ext: '' };
       const ext = (item.extension || item.name?.split('.').pop() || '').toLowerCase();
       const mime = item.last_version_cache?.file_metadata?.mime || '';
-      
-      switch (filter) {
-        case 'document':
-          return ['doc', 'docx', 'odt', 'txt', 'rtf'].includes(ext) || mime.includes('document') || mime.includes('text');
-        case 'spreadsheet':
-          return ['xls', 'xlsx', 'ods', 'csv'].includes(ext) || mime.includes('spreadsheet');
-        case 'presentation':
-          return ['ppt', 'pptx', 'odp'].includes(ext) || mime.includes('presentation');
-        case 'pdf':
-          return ext === 'pdf' || mime === 'application/pdf';
-        case 'image':
-          return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico'].includes(ext) || mime.startsWith('image/');
-        case 'video':
-          return ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv'].includes(ext) || mime.startsWith('video/');
-        case 'audio':
-          return ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext) || mime.startsWith('audio/');
-        default:
-          return true;
-      }
+      // Word / rich documents
+      if (['doc', 'docx', 'odt'].includes(ext) || mime.includes('wordprocessing'))
+        return { category: 1, ext };
+      // Excel / spreadsheets
+      if (['xls', 'xlsx', 'ods', 'csv'].includes(ext) || mime.includes('spreadsheet'))
+        return { category: 2, ext };
+      // PowerPoint / presentations
+      if (['ppt', 'pptx', 'odp'].includes(ext) || mime.includes('presentation'))
+        return { category: 3, ext };
+      // PDF
+      if (['pdf'].includes(ext) || mime === 'application/pdf')
+        return { category: 4, ext };
+      // Plain text (txt, rtf, etc.) — after Office docs
+      if (['txt', 'rtf', 'md', 'log'].includes(ext) || mime === 'text/plain' || mime === 'text/rtf')
+        return { category: 5, ext };
+      // Audio
+      if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext) || mime.startsWith('audio/'))
+        return { category: 6, ext };
+      // Video
+      if (['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv'].includes(ext) || mime.startsWith('video/'))
+        return { category: 7, ext };
+      // Archives
+      if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2'].includes(ext))
+        return { category: 8, ext };
+      // Images — always last
+      if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico', 'heic', 'tiff'].includes(ext) || mime.startsWith('image/'))
+        return { category: 99, ext };
+      return { category: 9, ext }; // Other files
     }, []);
 
     const visibleItems = useMemo(() => {
@@ -226,14 +232,28 @@ export default memo(
       if (showSharedOnly && isMyDrive) {
         filtered = filtered.filter(item => hasSharedDriveAccess(item));
       }
-      
-      // Filtre par type
-      if (typeFilter) {
-        filtered = filtered.filter(item => matchesTypeFilter(item, typeFilter));
+
+      // Client-side sort by type — groups by category, images/videos always last
+      // Category order is always fixed; asc/desc only affects order within same category
+      if (sortLabel.by === 'type') {
+        const dir = sortLabel.order === 'asc' ? 1 : -1;
+        filtered = [...filtered].sort((a, b) => {
+          const keyA = getTypeSortKey(a);
+          const keyB = getTypeSortKey(b);
+          // Category order is always ascending (docs before images)
+          if (keyA.category !== keyB.category) {
+            return keyA.category - keyB.category;
+          }
+          // Same category: asc/desc applies to extension
+          const extCompare = keyA.ext.localeCompare(keyB.ext);
+          if (extCompare !== 0) return extCompare * dir;
+          // Same extension: asc/desc applies to name
+          return (a.name || '').localeCompare(b.name || '') * dir;
+        });
       }
       
       return filtered;
-    }, [memoizedItems, showSharedOnly, isMyDrive, typeFilter, matchesTypeFilter]);
+    }, [memoizedItems, showSharedOnly, isMyDrive, sortLabel, getTypeSortKey]);
 
     const uploadZone = 'drive_' + companyId;
     const uploadZoneRef = useRef<UploadZone | null>(null);
@@ -940,7 +960,7 @@ export default memo(
                     <Button
                       theme={'secondary'}
                       className="ml-2 flex flex-row items-center border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-950/30 px-2 md:px-3 shadow-sm"
-                      disabled={access !== 'manage'}
+                      disabled={access === 'read' || access === 'none' || !access}
                       onClick={() => {
                         if (inTrash) {
                           setConfirmDeleteModalState({ open: true, items: selectedItems as any });
@@ -954,7 +974,7 @@ export default memo(
                       <span>{inTrash ? 'Supprimer' : 'Corbeille'}</span>
                     </Button>
 
-                    <Menu menu={() => onBuildContextMenu(details, selectedCount === 1 ? selectedItems[0] : undefined)} testClassId="browser-menu-bulk-actions">
+                    <Menu menu={() => onBuildContextMenu(details, selectedCount === 1 && selectedItems.length > 0 ? selectedItems[0] : undefined)} testClassId="browser-menu-bulk-actions">
                       <Button
                         theme="secondary"
                         className="ml-2 flex flex-row items-center border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 !text-zinc-700 dark:!text-zinc-200 hover:!bg-zinc-50 dark:hover:!bg-zinc-800 px-2 md:px-3 shadow-sm"

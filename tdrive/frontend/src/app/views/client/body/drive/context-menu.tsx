@@ -16,7 +16,7 @@ import { DriveApiClient, getPublicLinkToken } from '@features/drive/api-client/a
 import { useDriveActions } from '@features/drive/hooks/use-drive-actions';
 import { getPublicLink } from '@features/drive/hooks/use-drive-item';
 import { useDrivePreview } from '@features/drive/hooks/use-drive-preview';
-import { DriveItemSelectedList, DriveItemSort, DriveItemTypeFilter } from '@features/drive/state/store';
+import { DriveItemSelectedList, DriveItemSort } from '@features/drive/state/store';
 import { DriveItem, DriveItemDetails } from '@features/drive/types';
 import { ToasterService } from '@features/global/services/toaster-service';
 import { copyToClipboard } from '@features/global/utils/CopyClipboard';
@@ -88,7 +88,7 @@ export const useOnBuildContextMenu = (
 
         let menu: any[] = [];
 
-        if (item && selectedCount < 2) {
+        if (item && selectedCount < 2 && item.id) {
           //Add item related menus
           let upToDateItem;
           let access = 'none';
@@ -316,7 +316,7 @@ export const useOnBuildContextMenu = (
               onClick: () =>
                 setSelectorModalState({
                   open: true,
-                  parent_id: inTrash ? 'root' : parent.item!.id,
+                  parent_id: inTrash ? 'root' : (parent.item?.id || 'root'),
                   title: Languages.t('components.item_context_menu.move_multiple.modal_header'),
                   mode: 'move',
                   onSelected: async ids => {
@@ -411,7 +411,7 @@ export const useOnBuildContextMenu = (
                   testClassId: 'create-folder',
                   type: 'menu',
                   text: Languages.t('components.create_modal.create_folder'),
-                  hide: inTrash || parent.access === 'read' || parent.item?.id === 'root',
+                  hide: inTrash || parent.access === 'read',
                   onClick: () =>
                     parent?.item?.id &&
                     setCreationModalState({ open: true, parent_id: parent?.item?.id, type: 'folder' }),
@@ -420,7 +420,7 @@ export const useOnBuildContextMenu = (
                   testClassId: 'add-documents',
                   type: 'menu',
                   text: Languages.t('components.item_context_menu.add_documents'),
-                  hide: inTrash || parent.access === 'read' || parent.item?.id === 'root',
+                  hide: inTrash || parent.access === 'read',
                   onClick: () =>
                     parent?.item?.id &&
                     setUploadModalState({ open: true, parent_id: parent?.item?.id }),
@@ -432,7 +432,7 @@ export const useOnBuildContextMenu = (
                   hide: inTrash,
                   onClick: () => {
                     if (parent.children && parent.children.length > 0) {
-                      downloadZip([parent.item!.id]);
+                      downloadZip([parent.item?.id || '']);
                     } else if (parent.item) {
                       console.log('Download folder itself');
                       download(parent.item.id);
@@ -447,7 +447,7 @@ export const useOnBuildContextMenu = (
                   testClassId: 'copy-link',
                   type: 'menu',
                   text: Languages.t('components.item_context_menu.copy_link'),
-                  hide: !hasAnyPublicLinkAccess(item),
+                  hide: true,
                   onClick: () => {
                     copyToClipboard(getPublicLink(item || parent?.item));
                     ToasterService.success(
@@ -455,12 +455,12 @@ export const useOnBuildContextMenu = (
                     );
                   },
                 },
-                { type: 'separator', hide: parent.item!.id != 'root' },
+                { type: 'separator', hide: !parent.item || parent.item.id != 'root' },
                 {
                   testClassId: 'manage-users',
                   type: 'menu',
                   text: Languages.t('components.item_context_menu.manage_users'),
-                  hide: parent.item!.id != 'root',
+                  hide: !parent.item || parent.item.id != 'root',
                   onClick: () => setUsersModalState({ open: true }),
                 },
               ];
@@ -665,7 +665,6 @@ export const useOnBuildFileContextMenu = () => {
 
 export const useOnBuildSortContextMenu = () => {
   const [sortItem, setSortItem] = useRecoilState(DriveItemSort);
-  const [typeFilter, setTypeFilter] = useRecoilState(DriveItemTypeFilter);
   return useCallback((isMyDrive?: boolean, showSharedOnly?: boolean, setShowSharedOnly?: (fn: (v: boolean) => boolean) => void) => {
     const menuItems: any[] = [
       {
@@ -674,13 +673,10 @@ export const useOnBuildSortContextMenu = () => {
         text: Languages.t('components.item_context_menu.sorting.by.date'),
         icon: sortItem.by === 'date' ? 'check' : 'sort-check',
         onClick: () => {
-          setSortItem(prevSortItem => {
-            const newSortItem = {
-              ...prevSortItem,
-              by: 'date',
-            };
-            return newSortItem;
-          });
+          setSortItem(prevSortItem => ({
+            ...prevSortItem,
+            by: 'date',
+          }));
         },
       },
       {
@@ -689,13 +685,10 @@ export const useOnBuildSortContextMenu = () => {
         text: Languages.t('components.item_context_menu.sorting.by.name'),
         icon: sortItem.by === 'name' ? 'check' : 'sort-check',
         onClick: () => {
-          setSortItem(prevSortItem => {
-            const newSortItem = {
-              ...prevSortItem,
-              by: 'name',
-            };
-            return newSortItem;
-          });
+          setSortItem(prevSortItem => ({
+            ...prevSortItem,
+            by: 'name',
+          }));
         },
       },
       {
@@ -704,13 +697,22 @@ export const useOnBuildSortContextMenu = () => {
         text: Languages.t('components.item_context_menu.sorting.by.size'),
         icon: sortItem.by === 'size' ? 'check' : 'sort-check',
         onClick: () => {
-          setSortItem(prevSortItem => {
-            const newSortItem = {
-              ...prevSortItem,
-              by: 'size',
-            };
-            return newSortItem;
-          });
+          setSortItem(prevSortItem => ({
+            ...prevSortItem,
+            by: 'size',
+          }));
+        },
+      },
+      {
+        testClassId: 'sorting-by-type',
+        type: 'menu',
+        text: Languages.t('components.item_context_menu.sorting.by.type', [], 'Type'),
+        icon: sortItem.by === 'type' ? 'check' : 'sort-check',
+        onClick: () => {
+          setSortItem(prevSortItem => ({
+            ...prevSortItem,
+            by: 'type',
+          }));
         },
       },
       {type:"separator"},
@@ -720,13 +722,10 @@ export const useOnBuildSortContextMenu = () => {
         text: Languages.t('components.item_context_menu.sorting.order.asc'),
         icon: sortItem.order === 'asc' ? 'check' : 'sort-check',
         onClick: () => {
-          setSortItem(prevSortItem => {
-            const newSortItem = {
-              ...prevSortItem,
-              order: 'asc',
-            };
-            return newSortItem;
-          });
+          setSortItem(prevSortItem => ({
+            ...prevSortItem,
+            order: 'asc',
+          }));
         },
       },
       {
@@ -735,13 +734,10 @@ export const useOnBuildSortContextMenu = () => {
         text: Languages.t('components.item_context_menu.sorting.order.desc'),
         icon: sortItem.order === 'desc' ? 'check' : 'sort-check',
         onClick: () => {
-          setSortItem(prevSortItem => {
-            const newSortItem = {
-              ...prevSortItem,
-              order: 'desc',
-            };
-            return newSortItem;
-          });
+          setSortItem(prevSortItem => ({
+            ...prevSortItem,
+            order: 'desc',
+          }));
         },
       },
     ];
@@ -760,29 +756,6 @@ export const useOnBuildSortContextMenu = () => {
       );
     }
 
-    // Type filter
-    const typeFilters: { key: string; label: string }[] = [
-      { key: '', label: Languages.t('components.item_context_menu.filter.all', [], 'Tous') },
-      { key: 'folder', label: Languages.t('components.item_context_menu.filter.folders', [], 'Dossiers') },
-      { key: 'document', label: Languages.t('components.item_context_menu.filter.documents', [], 'Documents') },
-      { key: 'spreadsheet', label: Languages.t('components.item_context_menu.filter.spreadsheets', [], 'Tableurs') },
-      { key: 'presentation', label: Languages.t('components.item_context_menu.filter.presentations', [], 'Présentations') },
-      { key: 'pdf', label: 'PDF' },
-      { key: 'image', label: Languages.t('components.item_context_menu.filter.images', [], 'Images') },
-      { key: 'video', label: Languages.t('components.item_context_menu.filter.videos', [], 'Vidéos') },
-      { key: 'audio', label: Languages.t('components.item_context_menu.filter.audio', [], 'Audio') },
-    ];
-    menuItems.push({ type: 'separator' });
-    typeFilters.forEach(({ key, label }) => {
-      menuItems.push({
-        testClassId: `filter-type-${key || 'all'}`,
-        type: 'menu',
-        text: label,
-        icon: typeFilter === key ? 'check' : 'filter',
-        onClick: () => setTypeFilter(key as any),
-      });
-    });
-
     return menuItems;
-  }, [sortItem, typeFilter]);
+  }, [sortItem]);
 };
