@@ -2,12 +2,12 @@
 FROM node:lts-alpine AS build
 
 # Activer pnpm via corepack
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9 --activate
 
 WORKDIR /tdrive-react
 
 # Meilleur cache : d'abord les manifestes + lockfile
-COPY frontend/package.json frontend/pnpm-lock.yaml frontend/.npmrc ./
+COPY frontend/package.json frontend/pnpm-lock.yaml frontend/.npmrc frontend/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # Copier le package.json racine (pour lire la version dans vite.config.ts)

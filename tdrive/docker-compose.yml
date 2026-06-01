@@ -45,7 +45,7 @@ services:
       - tdrive_default
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U onlyoffice"]
+      test: [ "CMD-SHELL", "pg_isready -U onlyoffice" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -81,7 +81,7 @@ services:
       - tdrive_default
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/healthcheck"]
+      test: [ "CMD", "curl", "-f", "http://localhost/healthcheck" ]
       interval: 15s
       timeout: 10s
       retries: 10
