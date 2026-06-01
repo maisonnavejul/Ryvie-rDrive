@@ -12,8 +12,10 @@ import { Button } from '@atoms/button/button';
 import fileUploadApiClient from '@features/files/api/file-upload-api-client';
 import { Draggable } from 'app/features/dragndrop/hook/draggable';
 import { Droppable } from 'app/features/dragndrop/hook/droppable';
+import { useUser } from '@features/users/hooks/use-user';
+import { UserIcon } from '@heroicons/react/24/outline';
 
-const GalleryThumbnail: React.FC<{ item: DriveItem }> = ({ item }) => {
+const GalleryThumbnail: React.FC<{ item: DriveItem }> = memo(({ item }) => {
   const isDir = (item as any).is_directory;
   const meta = (item as any)?.last_version_cache?.file_metadata as any;
   const name = (item as any)?.name || '';
@@ -50,23 +52,20 @@ const GalleryThumbnail: React.FC<{ item: DriveItem }> = ({ item }) => {
   const [errored, setErrored] = useState(false);
   const thumbUrl = !errored ? initialThumbUrl : undefined;
   const looksLikeImage = !isDir && (isImage || likelyImageByExt);
-  // Ne pas afficher le spinner de chargement pour les fichiers cloud
-  const [isLoading, setIsLoading] = useState(!isCloudProvider);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // If we don't have any preview URL for an image-like file (e.g., Dropbox/Google Drive without thumbnails),
-  // show a short skeleton, then display a violet photo icon.
   React.useEffect(() => {
-    // Reset loading state when item changes (sauf pour les cloud providers)
-    setIsLoading(!isCloudProvider);
-  }, [(item as any)?.id, isCloudProvider]);
+    // Reset loading state when item changes
+    setIsLoading(!!thumbUrl);
+  }, [(item as any)?.id, thumbUrl]);
 
   return (
-    <div className="aspect-square w-full overflow-hidden rounded-t-lg bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center">
+    <div className="aspect-square w-full overflow-hidden rounded-t-lg bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center" style={{ contentVisibility: 'auto' }}>
       {(() => {
         if (!isDir && (isVideo || likelyVideoByExt)) {
           return (
-            <div className="h-full w-full bg-yellow-50 dark:bg-yellow-900 flex items-center justify-center">
-              <VideoCameraIcon className="h-16 w-16 text-yellow-600 dark:text-yellow-300" />
+            <div className="h-full w-full bg-yellow-50 dark:bg-yellow-900/30 flex items-center justify-center">
+              <VideoCameraIcon className="h-16 w-16 text-yellow-500 dark:text-yellow-400" />
             </div>
           );
         }
@@ -75,8 +74,8 @@ const GalleryThumbnail: React.FC<{ item: DriveItem }> = ({ item }) => {
           return (
             <div className="relative h-full w-full">
               {isLoading && (
-                <div className="absolute inset-0 bg-zinc-100 dark:bg-zinc-700 animate-pulse flex items-center justify-center">
-                  <div className="h-8 w-8 border-4 border-blue-500 dark:border-blue-300 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                  <PhotoIcon className="h-16 w-16 text-blue-400 dark:text-blue-300" />
                 </div>
               )}
               <img
@@ -96,12 +95,8 @@ const GalleryThumbnail: React.FC<{ item: DriveItem }> = ({ item }) => {
 
         if (looksLikeImage && !thumbUrl) {
           return (
-            <div className="h-full w-full bg-blue-50 dark:bg-blue-900 flex items-center justify-center">
-              {isLoading ? (
-                <div className="h-8 w-8 border-4 border-blue-500 dark:border-blue-300 border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <PhotoIcon className="h-16 w-16 text-blue-600" />
-              )}
+            <div className="h-full w-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+              <PhotoIcon className="h-16 w-16 text-blue-400 dark:text-blue-300" />
             </div>
           );
         }
@@ -110,7 +105,7 @@ const GalleryThumbnail: React.FC<{ item: DriveItem }> = ({ item }) => {
       })()}
     </div>
   );
-};
+});
 
 export interface GalleryViewProps {
   items: DriveItem[];
@@ -124,6 +119,23 @@ export interface GalleryViewProps {
 
 const clamp = (str: string, n = 48) => (str.length > n ? str.slice(0, n - 1) + '…' : str);
 
+const OwnerLabel: React.FC<{ creatorId?: string }> = memo(({ creatorId }) => {
+  const user = useUser(creatorId || '');
+  if (!creatorId) return null;
+  const name = user
+    ? (user.first_name && user.last_name
+        ? `${user.first_name} ${user.last_name}`
+        : user.username || user.email || '')
+    : '';
+  if (!name) return null;
+  return (
+    <div className="flex items-center gap-1 text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 truncate" title={name}>
+      <UserIcon className="h-3 w-3 shrink-0" />
+      <span className="truncate">{name}</span>
+    </div>
+  );
+});
+
 const GalleryItemCard: React.FC<{
   item: DriveItem;
   isChecked: boolean;
@@ -133,12 +145,13 @@ const GalleryItemCard: React.FC<{
   onContextMenu?: (item: DriveItem, evt: React.MouseEvent) => void;
   buildContextMenu?: (item: DriveItem) => any;
   isMobile: boolean;
-}> = ({ item, isChecked, onCheck, onOpenFolder, onOpenFile, onContextMenu, buildContextMenu, isMobile }) => {
+}> = memo(({ item, isChecked, onCheck, onOpenFolder, onOpenFile, onContextMenu, buildContextMenu, isMobile }) => {
   const isDir = item.is_directory;
   return (
     <div
       id={`DR-${item.id}`}
-      className={`group drive-grid-item relative rounded-lg border-2 ${isChecked ? 'border-blue-500 dark:border-blue-400 shadow-md' : 'border-zinc-200 dark:border-zinc-700'} hover:border-blue-500 dark:hover:border-blue-400 bg-white dark:bg-zinc-800 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-blue-500/10 transition-all duration-200`}
+      className={`group drive-grid-item relative rounded-lg border-2 ${isChecked ? 'border-blue-500 dark:border-blue-400 shadow-md' : 'border-zinc-200 dark:border-zinc-700'} hover:border-blue-500 dark:hover:border-blue-400 bg-white dark:bg-zinc-800 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-blue-500/10 transition-shadow transition-colors duration-150`}
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '0 220px' }}
       onClick={() => (isDir ? onOpenFolder(item.id) : onOpenFile && onOpenFile(item.id))}
       onContextMenu={evt => onContextMenu && onContextMenu(item, evt)}
     >
@@ -173,7 +186,7 @@ const GalleryItemCard: React.FC<{
       <GalleryThumbnail item={item as any} />
 
       {/* Meta */}
-      <div className="px-3 py-2 h-[52px]">
+      <div className="px-3 py-2 h-[68px]">
         <div className="flex items-start gap-2">
           <div className="min-w-0 grow text-xs leading-4">
             <div className="font-medium text-zinc-800 dark:text-zinc-100 truncate" title={item.name}>
@@ -181,6 +194,7 @@ const GalleryItemCard: React.FC<{
             </div>
             {/* Afficher la taille pour les fichiers ET les dossiers */}
             <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">{formatBytes(item.size || 0)}</div>
+            <OwnerLabel creatorId={(item as any).creator} />
           </div>
           <div className="shrink-0 flex items-center gap-1">
             {hasSharedDriveAccess(item as any) && (
@@ -196,14 +210,14 @@ const GalleryItemCard: React.FC<{
       </div>
     </div>
   );
-};
+});
 
 export const GalleryView: React.FC<GalleryViewProps> = memo(
   ({ items, checked, onCheck, onOpenFolder, onOpenFile, onContextMenu, buildContextMenu }) => {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     return (
       <div className="p-2">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3" style={{ willChange: 'transform' }}>
           {items.map((item, index) => {
             const isChecked = !!checked[item.id];
             const isDir = item.is_directory;
@@ -219,8 +233,14 @@ export const GalleryView: React.FC<GalleryViewProps> = memo(
             };
             if (isDir) {
               return (
-                <Droppable key={item.id} id={index}>
-                  <GalleryItemCard {...cardProps} />
+                <Droppable key={item.id} id={index} data={{ item }}>
+                  {isMobile ? (
+                    <GalleryItemCard {...cardProps} />
+                  ) : (
+                    <Draggable id={index} data={{ item }}>
+                      <GalleryItemCard {...cardProps} />
+                    </Draggable>
+                  )}
                 </Droppable>
               );
             }

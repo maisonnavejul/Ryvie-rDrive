@@ -9,12 +9,14 @@ import {
   ChevronLeftIcon,
   FolderPlusIcon,
   LinkIcon,
+  ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { atom, useRecoilState } from 'recoil';
 import { slideXTransition, slideXTransitionReverted } from 'src/utils/transitions';
 import { CreateFolder } from './create-folder';
 import { CreateLink } from './create-link';
+import { CreateDocument } from './create-document';
 import Languages from "features/global/services/languages-service";
 import { FileTypeDocumentIcon, FileTypeSlidesIcon, FileTypeSpreadsheetIcon } from 'app/atoms/icons-colored';
 
@@ -22,6 +24,9 @@ export type CreateModalAtomType = {
   open: boolean;
   parent_id: string;
   type?: string;
+  docUrl?: string;
+  docFilename?: string;
+  docTypeName?: string;
 };
 
 export const CreateModalAtom = atom<CreateModalAtomType>({
@@ -33,6 +38,8 @@ export const CreateModalAtom = atom<CreateModalAtomType>({
 });
 
 export const CreateModal = ({
+  selectFromDevice,
+  selectFolderFromDevice,
   addFromUrl,
 }: {
   selectFromDevice: () => void;
@@ -79,6 +86,19 @@ export const CreateModal = ({
             {...(!state.type ? slideXTransitionReverted : slideXTransition)}
           >
             <div className="-m-2">
+              <CreateModalOption
+                icon={<ArrowUpTrayIcon className="w-5 h-5" />}
+                text={Languages.t('components.create_modal.upload_files')}
+                onClick={() => { setState({ ...state, open: false }); selectFromDevice(); }}
+                testClassId="create-upload-files-option"
+              />
+              <CreateModalOption
+                icon={<ArrowUpTrayIcon className="w-5 h-5" />}
+                text={Languages.t('components.create_modal.upload_folders')}
+                onClick={() => { setState({ ...state, open: false }); selectFolderFromDevice(); }}
+                testClassId="create-upload-folder-option"
+              />
+              <div className="mx-2 my-1 border-t border-zinc-200 dark:border-zinc-700" />
               <CreateModalOption
                 icon={<FolderPlusIcon className="w-5 h-5" />}
                 text={Languages.t('components.create_modal.create_folder')}
@@ -133,7 +153,13 @@ export const CreateModal = ({
                       )}
                       text={Languages.t(`${app.emptyFile.name}`)}
                       onClick={() =>
-                        addFromUrl(app.emptyFile.url, app.emptyFile.filename || app.emptyFile.name)
+                        setState({
+                          ...state,
+                          type: 'document',
+                          docUrl: app.emptyFile.url,
+                          docFilename: app.emptyFile.filename || app.emptyFile.name,
+                          docTypeName: app.emptyFile.name,
+                        })
                       }
                       testClassId={app.emptyFile.name.replaceAll(' ' ,'-').toLocaleLowerCase()}
                     />
@@ -164,6 +190,25 @@ export const CreateModal = ({
             {...(!state.type ? slideXTransitionReverted : slideXTransition)}
           >
             <CreateLink />
+          </Transition>
+
+          <Transition
+            style={{
+              gridColumn: '1 / 1',
+              gridRow: '1 / 1',
+            }}
+            show={state.type === 'document'}
+            as="div"
+            {...(!state.type ? slideXTransitionReverted : slideXTransition)}
+          >
+            {state.type === 'document' && state.docUrl && state.docFilename && (
+              <CreateDocument
+                addFromUrl={addFromUrl}
+                url={state.docUrl}
+                defaultFilename={state.docFilename}
+                docTypeName={state.docTypeName || ''}
+              />
+            )}
           </Transition>
         </div>
       </ModalContent>

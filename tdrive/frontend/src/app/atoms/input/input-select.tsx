@@ -1,6 +1,6 @@
 import _, { isUndefined } from "lodash";
 import { defaultInputClassName, errorInputClassName, ThemeName } from './input-text';
-import { CSSProperties } from "@material-ui/styles";
+import { CSSProperties } from "@mui/styles";
 
 export type SelectSize = 'md' | 'lg' | 'sm';
 

@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { getConfig } from "../../../framework/api/admin";
 import { AdminDeleteUserController } from "../controller/delete-user-controller";
 
@@ -30,7 +30,7 @@ function getUserIfValidQuery(request: FastifyRequest, reply: FastifyReply) {
 
 type TUserGetIdByEmailBody = TQueryBody & { email: string };
 
-const routes: FastifyPluginCallback = async (fastify: FastifyInstance, _opts, next) => {
+const routes: FastifyPluginAsync = async (fastify: FastifyInstance, _opts) => {
   const urlRoot = "/api/user/delete";
   const config = getConfig();
   const controller = new AdminDeleteUserController();
@@ -76,7 +76,6 @@ const routes: FastifyPluginCallback = async (fastify: FastifyInstance, _opts, ne
       return await controller.markToDelete(userId);
     });
   }
-  next();
 };
 
 export default routes;

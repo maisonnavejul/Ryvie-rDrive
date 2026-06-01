@@ -115,6 +115,9 @@ export class DocumentsService {
     } else if (id === 'root') {
       // Pour le Shared Drive (root), afficher les fichiers avec permissions "company"
       return this.companyShared(options, context);
+    } else if (id.startsWith('user_')) {
+      // Pour "Mon Drive" (user_*): inclure les fichiers personnels ET les fichiers créés par l'utilisateur dans le Drive partagé
+      return this.userDrive(id, options, context);
     } else {
       return {
         nextPage: null,
@@ -159,15 +162,15 @@ export class DocumentsService {
     const allEntities = allFiles.getEntities();
     console.log(`🔍 COMPANY SHARED DEBUG: Found ${allEntities.length} total files in company`);
 
-    // Filtrer les fichiers explicitement partagés avec le Shared Drive
+    // Filtrer les fichiers du Drive partagé :
+    // - fichiers avec parent_id === "root" (créés directement dans le Drive partagé)
+    // - fichiers avec l'entité shared_drive dans access_info (partagés explicitement)
     const companySharedFiles = allEntities.filter(file => {
+      const isDirectChild = file.parent_id === "root";
       const hasSharedDriveAccess = file.access_info?.entities?.some(entity => 
         entity.type === "folder" && entity.id === "shared_drive"
       );
-      if (hasSharedDriveAccess) {
-        console.log(`✅ SHARED DRIVE: Found file explicitly shared to Shared Drive: ${file.name}`);
-      }
-      return hasSharedDriveAccess;
+      return isDirectChild || hasSharedDriveAccess;
     });
 
     console.log(`🎯 COMPANY SHARED RESULT: Returning ${companySharedFiles.length} company-shared files`);
@@ -180,10 +183,91 @@ export class DocumentsService {
 
     const result = fileList.getEntities();
 
+    // Compute real access level for the Shared Drive root
+    const rootAccess = await getAccessLevel("root", null, this.repository, context);
+
     return {
-      access: "read",
+      access: rootAccess,
       children: result,
       nextPage: fileList.nextPage,
+      path: [] as Array<DriveFile>,
+    };
+  };
+
+  userDrive = async (
+    userId: string,
+    options: SearchDocumentsOptions,
+    context: DriveExecutionContext & { public_token?: string },
+  ): Promise<BrowseDetails> => {
+    if (options.pagination) {
+      if (options.pagination.page_token == "1") {
+        delete options.pagination.page_token;
+      }
+    }
+
+    if (options.sort) {
+      options.sort = this.getSortFieldMapping(options.sort);
+    }
+
+    // Handle pagination differently for non-MongoDB platforms
+    globalResolver.platformServices.search.handlePagination(options);
+
+    // 1. Get personal files (parent_id === user_*)
+    const personalFiles: ListResult<DriveFile> = await this.repository.find(
+      {
+        company_id: context.company.id,
+        parent_id: userId,
+        is_in_trash: false,
+      },
+      {
+        sort: {
+          is_directory: "desc",
+          ...(options.sort || {}),
+        },
+      },
+      context,
+    );
+
+    // 2. Get files created by user in the shared drive root (parent_id === "root")
+    const sharedDriveFiles: ListResult<DriveFile> = await this.repository.find(
+      {
+        company_id: context.company.id,
+        parent_id: "root",
+        is_in_trash: false,
+      },
+      {
+        sort: {
+          is_directory: "desc",
+          ...(options.sort || {}),
+        },
+      },
+      context,
+    );
+
+    // Filter to only include files created by the current user
+    const userSharedFiles = sharedDriveFiles.getEntities().filter(f => f.creator === context.user.id);
+
+    // Combine personal files + user's shared drive files (dedup)
+    const personalIds = new Set(personalFiles.getEntities().map(f => f.id));
+    const uniqueSharedFiles = userSharedFiles.filter(f => !personalIds.has(f.id));
+    const allUserFiles = [...personalFiles.getEntities(), ...uniqueSharedFiles];
+
+    console.log(`USER_DRIVE DEBUG: Found ${personalFiles.getEntities().length} personal files + ${uniqueSharedFiles.length} shared drive files = ${allUserFiles.length} total for user ${context.user.id}`);
+
+    // Compute access level for the user folder
+    const userFolderAccess = await getAccessLevel(userId, null, this.repository, context);
+
+    return {
+      access: userFolderAccess,
+      item: {
+        id: userId,
+        parent_id: null,
+        name: "Mon Drive",
+        is_directory: true,
+        size: allUserFiles.reduce((sum, f) => sum + (f.size || 0), 0),
+      } as DriveFile,
+      children: allUserFiles,
+      nextPage: personalFiles.nextPage,
       path: [] as Array<DriveFile>,
     };
   };
@@ -448,6 +532,10 @@ export class DocumentsService {
       const driveItemVersion = getDefaultDriveItemVersion(version, context);
       driveItem.scope = await getItemScope(driveItem, this.repository, context);
 
+      this.logger.info(`CREATE DEBUG: parent_id="${driveItem.parent_id}", user="${context.user?.id}", company="${context.company?.id}"`);
+      const accessLevel = await getAccessLevel(driveItem.parent_id, null, this.repository, context);
+      this.logger.info(`CREATE DEBUG: accessLevel for parent "${driveItem.parent_id}" = "${accessLevel}"`);
+
       const hasAccess = await checkAccess(
         driveItem.parent_id,
         null,
@@ -455,9 +543,27 @@ export class DocumentsService {
         this.repository,
         context,
       );
+      this.logger.info(`CREATE DEBUG: hasAccess (write) = ${hasAccess}`);
       if (!hasAccess) {
         this.logger.error("User does not have access to parent drive item", driveItem.parent_id);
         throw Error("User does not have access to this item parent");
+      }
+
+      // Auto-ajouter l'entité shared_drive si on crée dans le Drive partagé (root)
+      // ou dans un dossier qui est déjà dans le Drive partagé
+      const shouldAddSharedDrive = await this.shouldInheritSharedDriveAccess(driveItem.parent_id, context);
+      if (shouldAddSharedDrive) {
+        const alreadyHasSharedDrive = driveItem.access_info.entities.some(
+          e => e.type === "folder" && e.id === "shared_drive",
+        );
+        if (!alreadyHasSharedDrive) {
+          driveItem.access_info.entities.push({
+            id: "shared_drive",
+            type: "folder",
+            level: "manage",
+            grantor: context.user?.id || null,
+          });
+        }
       }
 
       let fileToProcess;
@@ -1923,5 +2029,44 @@ export class DocumentsService {
     ) {
       await this.notifyAVScanAlert(item, context);
     }
+  };
+
+  /**
+   * Checks if a new item should inherit shared_drive access from its parent.
+   * Returns true if:
+   * - parent_id is "root" (the Shared Drive virtual folder)
+   * - parent item already has a folder:shared_drive entity in its access_info
+   */
+  shouldInheritSharedDriveAccess = async (
+    parentId: string,
+    context: DriveExecutionContext,
+  ): Promise<boolean> => {
+    // Direct creation in Shared Drive root
+    if (parentId === "root") {
+      return true;
+    }
+
+    // Check if parent folder has shared_drive access
+    if (!isVirtualFolder(parentId)) {
+      try {
+        const parentItem = await this.repository.findOne(
+          {
+            id: parentId,
+            company_id: context.company.id,
+          },
+          {},
+          context,
+        );
+        if (parentItem?.access_info?.entities) {
+          return parentItem.access_info.entities.some(
+            e => e.type === "folder" && e.id === "shared_drive",
+          );
+        }
+      } catch (error) {
+        this.logger.warn("Failed to check parent shared_drive access", error);
+      }
+    }
+
+    return false;
   };
 }

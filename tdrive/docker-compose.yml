@@ -45,7 +45,7 @@ services:
       - tdrive_default
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U onlyoffice"]
+      test: [ "CMD-SHELL", "pg_isready -U onlyoffice" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -81,7 +81,7 @@ services:
       - tdrive_default
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/healthcheck"]
+      test: [ "CMD", "curl", "-f", "http://localhost/healthcheck" ]
       interval: 15s
       timeout: 10s
       retries: 10
@@ -89,7 +89,7 @@ services:
 
   onlyoffice-connector:
     container_name: app-rdrive-onlyoffice-connector
-    image: julescloud/rdrive-onlyoffice-connector:v0.0.4
+    image: julescloud/rdrive-onlyoffice-connector:v0.1.0
     environment:
       - SERVER_PORT=5000
       - SERVER_PREFIX=/plugins/onlyoffice/
@@ -127,7 +127,7 @@ services:
 
   node_create_user:
     container_name: app-rdrive-node-create-user
-    image: julescloud/rdrive-node-create-user:v0.0.5
+    image: julescloud/rdrive-node-create-user:v0.1.0
     env_file:
       - .env
     environment: &backend_env_vars
@@ -151,7 +151,6 @@ services:
     command: node dist/bin/sync_ldap_users.js
     volumes: &backend_volumes
       - ./docker-data/files:/tdrive/docker-data/files
-      - /usr/bin/rclone:/usr/bin/rclone:ro
       - /data/config/rclone:/root/.config/rclone
     depends_on: &backend_dependencies
       mongo:
@@ -165,7 +164,7 @@ services:
   node:
     container_name: app-rdrive-node
     restart: unless-stopped
-    image: julescloud/rdrive-node:v0.0.8
+    image: julescloud/rdrive-node:v0.1.0
     env_file:
       - .env
     ports:
@@ -192,7 +191,7 @@ services:
       - ryvie-network
 
   frontend:
-    image: julescloud/rdrive-frontend:v0.0.7
+    image: julescloud/rdrive-frontend:v0.1.0
     container_name: app-rdrive-frontend
     environment:
       - DEV=production

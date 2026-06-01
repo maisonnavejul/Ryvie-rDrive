@@ -32,7 +32,7 @@ export class OAuthService {
     const dynamicOauth = { ...oauth };
     try {
       const redirectUrl = new URL(dto.redirectUri);
-      dynamicOauth.issuerUrl = `http://${redirectUrl.hostname}:3005/realms/ryvie`;
+      dynamicOauth.issuerUrl = this.buildIssuerUrl(oauth.issuerUrl, redirectUrl.hostname);
       this.logger.debug(`Using dynamic issuerUrl for authorize: ${dynamicOauth.issuerUrl}`);
     } catch (error: any) {
       this.logger.warn(`Invalid redirectUri, using default issuerUrl: ${error.message}`);
@@ -60,15 +60,13 @@ export class OAuthService {
     try {
       const callbackUrl = new URL(dto.url);
       const params = callbackUrl.searchParams;
-      
-      // Extraire le hostname depuis le paramètre iss qui contient l'URL publique correcte
+
       if (params.get('iss')) {
         const issUrl = new URL(params.get('iss')!);
-        dynamicOauth.issuerUrl = `http://${issUrl.hostname}:3005/realms/ryvie`;
+        dynamicOauth.issuerUrl = this.buildIssuerUrl(oauth.issuerUrl, issUrl.hostname);
         this.logger.debug(`Using dynamic issuerUrl from iss parameter: ${dynamicOauth.issuerUrl}`);
       } else {
-        // Fallback: utiliser le hostname de l'URL du callback
-        dynamicOauth.issuerUrl = `http://${callbackUrl.hostname}:3005/realms/ryvie`;
+        dynamicOauth.issuerUrl = this.buildIssuerUrl(oauth.issuerUrl, callbackUrl.hostname);
         this.logger.debug(`Using dynamic issuerUrl from callback URL: ${dynamicOauth.issuerUrl}`);
       }
     } catch (error: any) {
@@ -172,7 +170,7 @@ export class OAuthService {
       try {
         const hostname = request.hostname || request.headers?.host?.split(':')[0];
         if (hostname) {
-          dynamicOauth.issuerUrl = `http://${hostname}:3005/realms/ryvie`;
+          dynamicOauth.issuerUrl = this.buildIssuerUrl(config.issuerUrl, hostname);
           this.logger.debug(`Using dynamic issuerUrl for logout: ${dynamicOauth.issuerUrl}`);
         }
       } catch (error: any) {
@@ -184,6 +182,12 @@ export class OAuthService {
 
     const endpoint = await this.repository.getLogoutEndpoint(dynamicOauth);
     return endpoint || LOGIN_URL;
+  }
+
+  private buildIssuerUrl(templateUrl: string, hostname: string): string {
+    const url = new URL(templateUrl);
+    url.hostname = hostname;
+    return url.toString().replace(/\/$/, '');
   }
 
   private generateState(): string {

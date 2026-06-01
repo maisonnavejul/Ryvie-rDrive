@@ -115,7 +115,10 @@ export default () => {
   // Détecter si on est dans le Drive partagé (root), Partagé avec moi, ou Corbeille
   const isInSharedDrive = viewId === 'root' || parentId === 'root';
   const isInSharedWithMe = viewId === 'shared_with_me';
-  const shouldHideCreateButton = isInSharedDrive || isInSharedWithMe || inTrash;
+  const isInMyDrive = viewId?.startsWith('user_') || parentId?.startsWith('user_');
+  // Permettre la création dans le Drive partagé et dans les dossiers partagés avec moi
+  const shouldHideCreateButton = isInSharedWithMe || inTrash;
+  const shouldHideUploadButton = isInCloudProvider || isInSharedWithMe || inTrash;
 
   const setConfirmDeleteModalState = useSetRecoilState(ConfirmDeleteModalAtom);
   const setCreationModalState = useSetRecoilState(CreateModalAtom);
@@ -129,10 +132,13 @@ export default () => {
       setTimeout(() => {
         setCreationModalState({ open: true, parent_id: 'user_'+user?.id });
       }, 100);
+    } else if (isInSharedDrive) {
+      // Dans le Drive partagé, créer directement à la racine partagée
+      setCreationModalState({ open: true, parent_id: parentId || 'root' });
     } else if (item?.id) {
       setCreationModalState({ open: true, parent_id: item.id });
     }
-  }, [item?.id, isInCloudProvider, user?.id, companyId, history, setCreationModalState]);
+  }, [item?.id, isInCloudProvider, isInSharedDrive, parentId, user?.id, companyId, history, setCreationModalState]);
 
   const uploadItemModal = useCallback(() => {
     // Si on est dans Dropbox/Google Drive, rediriger vers Mon drive
@@ -142,10 +148,13 @@ export default () => {
       setTimeout(() => {
         setUploadModalState({ open: true, parent_id: 'user_'+user?.id });
       }, 100);
+    } else if (isInSharedDrive) {
+      // Dans le Drive partagé, uploader directement à la racine partagée
+      setUploadModalState({ open: true, parent_id: parentId || 'root' });
     } else if (item?.id) {
       setUploadModalState({ open: true, parent_id: item.id });
     }
-  }, [item?.id, isInCloudProvider, user?.id, companyId, history, setUploadModalState]);
+  }, [item?.id, isInCloudProvider, isInSharedDrive, parentId, user?.id, companyId, history, setUploadModalState]);
 
   return (
     <div className="-m-4 overflow-hidden testid:sidebar-actions">
@@ -173,17 +182,19 @@ export default () => {
             testClassId="sidebar-action-upload-zone"
           />
 
-          <Button
-            onClick={() => uploadItemModal()}
-            shortcut='U'
-            size="lg"
-            theme="primary"
-            className="w-full mb-2 justify-center"
-            style={{ boxShadow: '0 0 10px 0 rgba(0, 122, 255, 0.5)' }}
-            testClassId="button-upload"
-          >
-            <ArrowUpTrayIcon className="w-5 h-5 mr-2" /> {Languages.t('components.side_menu.buttons.upload')}
-          </Button>
+          {!shouldHideUploadButton && (
+            <Button
+              onClick={() => uploadItemModal()}
+              shortcut='U'
+              size="lg"
+              theme="primary"
+              className="w-full mb-2 justify-center"
+              style={{ boxShadow: '0 0 10px 0 rgba(0, 122, 255, 0.5)' }}
+              testClassId="button-upload"
+            >
+              <ArrowUpTrayIcon className="w-5 h-5 mr-2" /> {Languages.t('components.side_menu.buttons.upload')}
+            </Button>
+          )}
           {!shouldHideCreateButton && (
             <Button
               onClick={() => openItemModal()}

@@ -3,10 +3,11 @@ import { logger } from "../../framework/logger";
 import { CrudException } from "../../framework/api/crud-service";
 
 function serverErrorHandler(server: FastifyInstance): void {
-  server.setErrorHandler(async (err, request, reply) => {
+  server.setErrorHandler(async (_err, request, reply) => {
+    const err = _err as Error & { statusCode?: number; status?: number };
     if (reply.statusCode == 200 || !reply.statusCode) {
-      const status = err.statusCode || (err as any).status;
-      reply.status(status < 400 ? 500 : status);
+      const status = err.statusCode || err.status;
+      reply.status(status && status >= 400 ? status : 500);
     }
     logger.error(
       err instanceof CrudException

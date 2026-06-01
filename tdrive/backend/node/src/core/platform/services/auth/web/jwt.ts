@@ -1,4 +1,4 @@
-import { FastifyPluginCallback, FastifyRequest } from "fastify";
+import { FastifyPluginAsync, FastifyRequest } from "fastify";
 import fastifyJwt from "@fastify/jwt";
 import cookie from "@fastify/cookie";
 import fp from "fastify-plugin";
@@ -8,7 +8,7 @@ import { executionStorage } from "../../../framework/execution-storage";
 import gr from "../../../../../services/global-resolver";
 import { CrudException } from "../../../framework/api/crud-service";
 
-const jwtPlugin: FastifyPluginCallback = async (fastify, _opts, next) => {
+const jwtPlugin: FastifyPluginAsync = async (fastify, _opts) => {
   fastify.register(cookie);
   fastify.register(fastifyJwt, {
     secret: config.get("auth.jwt.secret") as string,
@@ -73,7 +73,6 @@ const jwtPlugin: FastifyPluginCallback = async (fastify, _opts, next) => {
     } catch (err) {}
   });
 
-  next();
 };
 
 export default fp(jwtPlugin, {

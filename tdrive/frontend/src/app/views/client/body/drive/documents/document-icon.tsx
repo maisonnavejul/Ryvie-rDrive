@@ -7,6 +7,7 @@ import {
   FileTypePdfIcon,
   FileTypeSlidesIcon,
   FileTypeSpreadsheetIcon,
+  FileTypeTextIcon,
   FileTypeUnknownIcon,
 } from '@atoms/icons-colored';
 import { FolderIcon } from 'app/atoms/icons-colored';
@@ -20,13 +21,14 @@ const FileTypeIcons: { [key: string]: (props: ComponentProps<'svg'>) => JSX.Elem
   archive: FileTypeArchiveIcon,
   pdf: FileTypePdfIcon,
   document: FileTypeDocumentIcon,
+  text: FileTypeTextIcon,
   spreadsheet: FileTypeSpreadsheetIcon,
   slides: FileTypeSlidesIcon,
   link: FileTypeLinkIcon,
 };
 
 const extensionToFileType: { [key: string]: string } = {
-  doc: 'document', docx: 'document', odt: 'document', rtf: 'document', txt: 'document',
+  doc: 'document', docx: 'document', odt: 'document', rtf: 'document', txt: 'text',
   xls: 'spreadsheet', xlsx: 'spreadsheet', ods: 'spreadsheet', csv: 'spreadsheet',
   ppt: 'slides', pptx: 'slides', odp: 'slides',
   pdf: 'pdf',
@@ -45,8 +47,11 @@ export const DocumentIcon = (props: {
   let fileType = props.fileType || fileUploadApiClient.mimeToType(
     props.item?.last_version_cache?.file_metadata?.mime || '',
   );
-  if (fileType === 'other' && props.item?.extension) {
-    fileType = extensionToFileType[props.item.extension.toLowerCase()] || fileType;
+  if (props.item?.extension) {
+    const extType = extensionToFileType[props.item.extension.toLowerCase()];
+    if (extType && (fileType === 'other' || extType !== fileType)) {
+      fileType = extType;
+    }
   }
   const metadata = (props.item?.last_version_cache?.file_metadata || {}) as FileMetadata;
   const className = props.className || 'h-5 w-5 shrink-0 text-gray-400';

@@ -19,8 +19,8 @@ export const DriveItemSelectedList = atom<{ [key: string]: boolean }>({
 export const DriveItemSort = atom<BrowseSort>({
   key: 'DriveItemSort',
   default: {
-    by: 'date',
-    order: 'desc',
+    by: 'type',
+    order: 'asc',
   },
 });
 
@@ -31,6 +31,13 @@ export const DriveItemPagination = atom<BrowsePaginate>({
     limit: 50,
     lastPage: false,
   },
+});
+
+export type DriveTypeFilter = '' | 'folder' | 'document' | 'spreadsheet' | 'presentation' | 'pdf' | 'image' | 'video' | 'audio';
+
+export const DriveItemTypeFilter = atom<DriveTypeFilter>({
+  key: 'DriveItemTypeFilter',
+  default: '',
 });
 
 // État pour la navigation instantanée

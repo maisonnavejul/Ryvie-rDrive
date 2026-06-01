@@ -88,7 +88,7 @@ export const useOnBuildContextMenu = (
 
         let menu: any[] = [];
 
-        if (item && selectedCount < 2) {
+        if (item && selectedCount < 2 && item.id) {
           //Add item related menus
           let upToDateItem;
           let access = 'none';
@@ -316,7 +316,7 @@ export const useOnBuildContextMenu = (
               onClick: () =>
                 setSelectorModalState({
                   open: true,
-                  parent_id: inTrash ? 'root' : parent.item!.id,
+                  parent_id: inTrash ? 'root' : (parent.item?.id || 'root'),
                   title: Languages.t('components.item_context_menu.move_multiple.modal_header'),
                   mode: 'move',
                   onSelected: async ids => {
@@ -411,7 +411,7 @@ export const useOnBuildContextMenu = (
                   testClassId: 'create-folder',
                   type: 'menu',
                   text: Languages.t('components.create_modal.create_folder'),
-                  hide: inTrash || parent.access === 'read' || parent.item?.id === 'root',
+                  hide: inTrash || parent.access === 'read',
                   onClick: () =>
                     parent?.item?.id &&
                     setCreationModalState({ open: true, parent_id: parent?.item?.id, type: 'folder' }),
@@ -420,7 +420,7 @@ export const useOnBuildContextMenu = (
                   testClassId: 'add-documents',
                   type: 'menu',
                   text: Languages.t('components.item_context_menu.add_documents'),
-                  hide: inTrash || parent.access === 'read' || parent.item?.id === 'root',
+                  hide: inTrash || parent.access === 'read',
                   onClick: () =>
                     parent?.item?.id &&
                     setUploadModalState({ open: true, parent_id: parent?.item?.id }),
@@ -432,7 +432,7 @@ export const useOnBuildContextMenu = (
                   hide: inTrash,
                   onClick: () => {
                     if (parent.children && parent.children.length > 0) {
-                      downloadZip([parent.item!.id]);
+                      downloadZip([parent.item?.id || '']);
                     } else if (parent.item) {
                       console.log('Download folder itself');
                       download(parent.item.id);
@@ -447,7 +447,7 @@ export const useOnBuildContextMenu = (
                   testClassId: 'copy-link',
                   type: 'menu',
                   text: Languages.t('components.item_context_menu.copy_link'),
-                  hide: !hasAnyPublicLinkAccess(item),
+                  hide: true,
                   onClick: () => {
                     copyToClipboard(getPublicLink(item || parent?.item));
                     ToasterService.success(
@@ -455,12 +455,12 @@ export const useOnBuildContextMenu = (
                     );
                   },
                 },
-                { type: 'separator', hide: parent.item!.id != 'root' },
+                { type: 'separator', hide: !parent.item || parent.item.id != 'root' },
                 {
                   testClassId: 'manage-users',
                   type: 'menu',
                   text: Languages.t('components.item_context_menu.manage_users'),
-                  hide: parent.item!.id != 'root',
+                  hide: !parent.item || parent.item.id != 'root',
                   onClick: () => setUsersModalState({ open: true }),
                 },
               ];
@@ -665,22 +665,18 @@ export const useOnBuildFileContextMenu = () => {
 
 export const useOnBuildSortContextMenu = () => {
   const [sortItem, setSortItem] = useRecoilState(DriveItemSort);
-  return useCallback(() => {
-    const menuItems = [
+  return useCallback((isMyDrive?: boolean, showSharedOnly?: boolean, setShowSharedOnly?: (fn: (v: boolean) => boolean) => void) => {
+    const menuItems: any[] = [
       {
         testClassId: 'sorting-by-date',
         type: 'menu',
         text: Languages.t('components.item_context_menu.sorting.by.date'),
         icon: sortItem.by === 'date' ? 'check' : 'sort-check',
         onClick: () => {
-          // keep the old value for sortItem and change the by value
-          setSortItem(prevSortItem => {
-            const newSortItem = {
-              ...prevSortItem,
-              by: 'date',
-            };
-            return newSortItem;
-          });
+          setSortItem(prevSortItem => ({
+            ...prevSortItem,
+            by: 'date',
+          }));
         },
       },
       {
@@ -689,13 +685,10 @@ export const useOnBuildSortContextMenu = () => {
         text: Languages.t('components.item_context_menu.sorting.by.name'),
         icon: sortItem.by === 'name' ? 'check' : 'sort-check',
         onClick: () => {
-          setSortItem(prevSortItem => {
-            const newSortItem = {
-              ...prevSortItem,
-              by: 'name',
-            };
-            return newSortItem;
-          });
+          setSortItem(prevSortItem => ({
+            ...prevSortItem,
+            by: 'name',
+          }));
         },
       },
       {
@@ -704,13 +697,22 @@ export const useOnBuildSortContextMenu = () => {
         text: Languages.t('components.item_context_menu.sorting.by.size'),
         icon: sortItem.by === 'size' ? 'check' : 'sort-check',
         onClick: () => {
-          setSortItem(prevSortItem => {
-            const newSortItem = {
-              ...prevSortItem,
-              by: 'size',
-            };
-            return newSortItem;
-          });
+          setSortItem(prevSortItem => ({
+            ...prevSortItem,
+            by: 'size',
+          }));
+        },
+      },
+      {
+        testClassId: 'sorting-by-type',
+        type: 'menu',
+        text: Languages.t('components.item_context_menu.sorting.by.type', [], 'Type'),
+        icon: sortItem.by === 'type' ? 'check' : 'sort-check',
+        onClick: () => {
+          setSortItem(prevSortItem => ({
+            ...prevSortItem,
+            by: 'type',
+          }));
         },
       },
       {type:"separator"},
@@ -720,13 +722,10 @@ export const useOnBuildSortContextMenu = () => {
         text: Languages.t('components.item_context_menu.sorting.order.asc'),
         icon: sortItem.order === 'asc' ? 'check' : 'sort-check',
         onClick: () => {
-          setSortItem(prevSortItem => {
-            const newSortItem = {
-              ...prevSortItem,
-              order: 'asc',
-            };
-            return newSortItem;
-          });
+          setSortItem(prevSortItem => ({
+            ...prevSortItem,
+            order: 'asc',
+          }));
         },
       },
       {
@@ -735,16 +734,28 @@ export const useOnBuildSortContextMenu = () => {
         text: Languages.t('components.item_context_menu.sorting.order.desc'),
         icon: sortItem.order === 'desc' ? 'check' : 'sort-check',
         onClick: () => {
-          setSortItem(prevSortItem => {
-            const newSortItem = {
-              ...prevSortItem,
-              order: 'desc',
-            };
-            return newSortItem;
-          });
+          setSortItem(prevSortItem => ({
+            ...prevSortItem,
+            order: 'desc',
+          }));
         },
-      }
+      },
     ];
+    if (isMyDrive && setShowSharedOnly) {
+      menuItems.push(
+        {type:"separator"},
+        {
+          testClassId: 'filter-shared-only',
+          type: 'menu',
+          text: Languages.t('scenes.app.drive.filter_shared', [], 'Fichiers partagés'),
+          icon: showSharedOnly ? 'check' : 'cloud',
+          onClick: () => {
+            setShowSharedOnly((v: boolean) => !v);
+          },
+        },
+      );
+    }
+
     return menuItems;
   }, [sortItem]);
 };

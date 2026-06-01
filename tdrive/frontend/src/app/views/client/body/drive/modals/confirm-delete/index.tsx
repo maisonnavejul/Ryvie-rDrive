@@ -8,6 +8,7 @@ import { DriveItem } from '@features/drive/types';
 import { useEffect, useState } from 'react';
 import { atom, useRecoilState } from 'recoil';
 import RouterServices from '@features/router/services/router-service';
+import Languages from '@features/global/services/languages-service';
 
 export type ConfirmDeleteModalType = {
   open: boolean;
@@ -51,12 +52,12 @@ const ConfirmDeleteModalContent = ({ items }: { items: DriveItem[] }) => {
     <ModalContent
       title={
         items.length === 1
-          ? `Definitively delete ${item?.name}`
-          : `Definitively delete ${items.length} items`
+          ? Languages.t('components.ConfirmDeleteModalContent_delete_item') + ` '${item?.name}'`
+          : Languages.t('components.ConfirmDeleteModalContent_delete_items', [items.length])
       }
     >
       <Base className="block my-3">
-        Click 'Delete' to definitively remove the selected items. You can't restore them later.
+        {Languages.t('components.ConfirmDeleteModalContent_delete_desc')}
       </Base>
       <br />
       <Button
@@ -73,7 +74,7 @@ const ConfirmDeleteModalContent = ({ items }: { items: DriveItem[] }) => {
         }}
         testClassId="button-delete"
       >
-        Delete
+        {Languages.t('components.ConfirmDeleteModalContent_delete')}
       </Button>
     </ModalContent>
   );

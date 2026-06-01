@@ -3,7 +3,7 @@ import React, { FC } from 'react';
 import { Col, Layout, Row } from 'antd';
 import './banner.scss';
 import { X } from 'react-feather';
-import { CSSProperties } from '@material-ui/styles';
+import { CSSProperties } from '@mui/styles';
 
 type PropsType = {
   closable?: boolean;
