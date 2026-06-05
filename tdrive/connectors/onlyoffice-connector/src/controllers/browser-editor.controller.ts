@@ -191,9 +191,10 @@ class BrowserEditorController {
       
       // Detect request origin to support both local and public access
       // Check X-Forwarded-Proto header for proxied requests (HTTPS behind reverse proxy)
+      // x-forwarded-host PRIORITAIRE: derrière le proxy, `host` = upstream interne.
       const forwardedProto = req.get('x-forwarded-proto');
       const protocol = forwardedProto || req.protocol || 'http';
-      const host = req.get('host') || req.get('x-forwarded-host') || '';
+      const host = req.get('x-forwarded-host') || req.get('host') || '';
       const requestOrigin = host ? `${protocol}://${host}` : undefined;
       
       res.redirect(
@@ -240,54 +241,39 @@ class BrowserEditorController {
         CREDENTIALS_SECRET,
       );
 
-      // Detect request origin to use same hostname for OnlyOffice server (avoid CORS)
+      // same-origin : tout dérive de l'hôte par lequel le navigateur est arrivé.
+      // x-forwarded-host PRIORITAIRE (derrière le proxy, `host` = upstream interne).
       const forwardedProto = req.get('x-forwarded-proto');
       const protocol = forwardedProto || req.protocol || 'http';
-      const host = req.get('host') || req.get('x-forwarded-host') || '';
-      
-      // Build OnlyOffice server URL using same origin as the request
+      const host = req.get('x-forwarded-host') || req.get('host') || '';
+      const base = host ? `${protocol}://${host}` : '';
+
+      // URL chargée par le NAVIGATEUR (DocsAPI api.js) -> nginx /onlyoffice-ds/ -> Document Server
       let onlyofficeServerUrl = initResponse.onlyoffice_server;
-      if (host) {
-        // Extract hostname without port
-        const hostname = host.split(':')[0];
-        
-        // Special case: if accessing via ryvie.local, use the machine's private IP instead
-        // This avoids CORS Private Network Access issues with .local domains
-        let targetHost = hostname;
-        if (hostname === 'ryvie.local') {
-          const privateIP = getPrivateIPAddress();
-          if (privateIP) {
-            targetHost = privateIP;
-            logger.info(`Accessing via ryvie.local - using private IP ${privateIP} for OnlyOffice to avoid CORS`);
-          }
-        }
-        
-        // Use same hostname (or private IP) with OnlyOffice port (8090)
-        onlyofficeServerUrl = `${protocol}://${targetHost}:8090/`;
-        logger.info(`🔧 [editor] OnlyOffice Server URL finale: ${onlyofficeServerUrl} (host: ${host}, targetHost: ${targetHost})`);
+      if (base) {
+        onlyofficeServerUrl = `${base}/onlyoffice-ds/`;
       }
 
-      // Build connector server URL using same hostname detection as OnlyOffice server
-      // This ensures OnlyOffice Document Server can reach the connector for callbacks
+      // URL utilisée par le NAVIGATEUR pour appeler le connecteur (ex: rename) -> same-origin
       let connectorServerUrl = makeURLTo.rootAbsolute();
-      if (host) {
-        const hostname = host.split(':')[0];
-        let targetHost = hostname;
-        if (hostname === 'ryvie.local') {
-          const privateIP = getPrivateIPAddress();
-          if (privateIP) {
-            targetHost = privateIP;
-          }
-        }
-        connectorServerUrl = `${protocol}://${targetHost}:5000/plugins/onlyoffice/`;
-        logger.info(`🔧 [editor] Connector Server URL for OnlyOffice callbacks: ${connectorServerUrl}`);
+      if (base) {
+        connectorServerUrl = `${base}/plugins/onlyoffice`;
       }
+
+      // URL INTERNE robuste utilisée par le DOCUMENT SERVER (read + callback de sauvegarde) :
+      // joint le nginx du frontend par le réseau Docker, indépendante du domaine d'accès.
+      const dsServerUrl = process.env.ONLYOFFICE_DS_CALLBACK_URL || 'http://frontend/plugins/onlyoffice';
+
+      logger.info(
+        `🔧 [editor] OnlyOffice DS(browser)=${onlyofficeServerUrl} | connector(browser)=${connectorServerUrl} | ds_server(internal)=${dsServerUrl} (host=${host})`,
+      );
 
       res.render('index', {
         ...initResponse,
         onlyoffice_server: onlyofficeServerUrl,
         docId: preview ? file_id : editing_session_key,
         server: connectorServerUrl,
+        ds_server: dsServerUrl,
         token: inPageToken,
       });
     } catch (error) {

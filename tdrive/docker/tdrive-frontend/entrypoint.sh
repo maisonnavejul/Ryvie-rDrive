@@ -39,6 +39,8 @@ case $SSL_CERTS in
 esac
 
 NODE_HOST="${NODE_HOST:-http://node:3000}"
+# OnlyOffice Document Server (même origine via /onlyoffice-ds/). Défaut: service "onlyoffice" sur tdrive_default.
+ONLYOFFICE_DOCUMENT_SERVER_HOST="${ONLYOFFICE_DOCUMENT_SERVER_HOST:-http://onlyoffice}"
 # Resolve ONLYOFFICE_CONNECTOR_HOST: if it contains a hostname that's in /etc/hosts, resolve it to IP
 ONLYOFFICE_CONNECTOR_HOST="${ONLYOFFICE_CONNECTOR_HOST:-http://onlyoffice-connector:5000}"
 OO_HOST=$(echo "$ONLYOFFICE_CONNECTOR_HOST" | sed -E 's|https?://([^:]+).*|\1|')
@@ -47,8 +49,8 @@ if [ -n "$OO_IP" ] && [ "$OO_IP" != "$OO_HOST" ]; then
   ONLYOFFICE_CONNECTOR_HOST=$(echo "$ONLYOFFICE_CONNECTOR_HOST" | sed "s|$OO_HOST|$OO_IP|")
   echo "Resolved ONLYOFFICE_CONNECTOR_HOST to $ONLYOFFICE_CONNECTOR_HOST"
 fi
-export NODE_HOST ONLYOFFICE_CONNECTOR_HOST
-envsubst '$${NODE_HOST} $${NGINX_LISTEN} $${ONLYOFFICE_CONNECTOR_HOST}' < /etc/nginx/sites-available/site.template > /etc/nginx/sites-enabled/site
+export NODE_HOST ONLYOFFICE_CONNECTOR_HOST ONLYOFFICE_DOCUMENT_SERVER_HOST
+envsubst '$${NODE_HOST} $${NGINX_LISTEN} $${ONLYOFFICE_CONNECTOR_HOST} $${ONLYOFFICE_DOCUMENT_SERVER_HOST}' < /etc/nginx/sites-available/site.template > /etc/nginx/sites-enabled/site
 
 # Inject runtime environment variables into config.js
 if [ -f /tdrive-react/build/config.js ]; then
