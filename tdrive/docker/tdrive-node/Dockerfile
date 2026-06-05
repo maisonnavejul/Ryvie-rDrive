@@ -1,12 +1,13 @@
 # Common node machine
 FROM node:lts-alpine AS node-base
 
-### Install system dependencies
+### Install system dependencies + rclone
 RUN apk add --update-cache \
       ghostscript \
       graphicsmagick \
       curl \
       openldap-clients \
+      rclone \
     && rm -rf /var/cache/apk/*
 
 WORKDIR /usr/src/app

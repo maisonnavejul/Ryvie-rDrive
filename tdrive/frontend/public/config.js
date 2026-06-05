@@ -47,15 +47,27 @@
     };
     
     console.log('🔧 [rDrive Config] Mode local détecté:', hostname, '→ OnlyOffice via:', onlyofficeHost);
-  } else {
-    // Configuration publique (injectée au build)
-    console.log('🌐 [rDrive Config] Mode public détecté');
+  } else if (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) {
+    // IP distante (tunnel Tailscale 100.x) → ports directs sur CET hôte (dynamique, plus d'IP en dur)
+    console.log('🌐 [rDrive Config] Mode IP distante détecté:', hostname);
+    const wsProto = (protocol === 'https:' ? 'wss:' : 'ws:');
     window.APP_CONFIG = {
-      FRONTEND_URL: '__REACT_APP_FRONTEND_URL__',
-      BACKEND_URL: '__REACT_APP_BACKEND_URL__',
-      WEBSOCKET_URL: '__REACT_APP_WEBSOCKET_URL__',
-      ONLYOFFICE_CONNECTOR_URL: '__REACT_APP_ONLYOFFICE_CONNECTOR_URL__',
-      ONLYOFFICE_DOCUMENT_SERVER_URL: '__REACT_APP_ONLYOFFICE_DOCUMENT_SERVER_URL__'
+      FRONTEND_URL: protocol + '//' + hostname + ':3010',
+      BACKEND_URL: protocol + '//' + hostname + ':4000',
+      WEBSOCKET_URL: wsProto + '//' + hostname + ':4000/ws',
+      ONLYOFFICE_CONNECTOR_URL: protocol + '//' + hostname + ':5000',
+      ONLYOFFICE_DOCUMENT_SERVER_URL: protocol + '//' + hostname + ':8090'
+    };
+  } else {
+    // Domaine public (*.ryvie.fr) → MÊME ORIGINE : le nginx du frontend proxie /api, /internal, /plugins, /auth
+    console.log('🌐 [rDrive Config] Mode public (même origine) détecté:', hostname);
+    const wsProto = (protocol === 'https:' ? 'wss:' : 'ws:');
+    window.APP_CONFIG = {
+      FRONTEND_URL: protocol + '//' + hostname,
+      BACKEND_URL: protocol + '//' + hostname,
+      WEBSOCKET_URL: wsProto + '//' + hostname + '/ws',
+      ONLYOFFICE_CONNECTOR_URL: protocol + '//' + hostname,
+      ONLYOFFICE_DOCUMENT_SERVER_URL: protocol + '//' + hostname
     };
   }
   

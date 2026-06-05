@@ -45,22 +45,27 @@ export class OAuthController {
         const query = request.query as any;
         
         // Reconstruire l'URL du callback avec /oauth-callback (la page frontend)
-        // car c'est cette URL qui a été envoyée à Keycloak comme redirect_uri
-        let host = request.headers.host || request.hostname;
+        // car c'est cette URL qui a été envoyée à Keycloak comme redirect_uri.
+        // host : l'hôte PUBLIC de l'app, via X-Forwarded-Host (nginx ne réécrit pas Host vers node).
+        const host =
+          (request.headers['x-forwarded-host'] as string) || request.headers.host || request.hostname;
+        // scheme : celui de l'iss (= scheme d'accès navigateur : https en public, http en LAN),
+        //          sinon X-Forwarded-Proto, sinon request.protocol.
+        let proto =
+          ((request.headers['x-forwarded-proto'] as string) || '').split(',')[0].trim() ||
+          request.protocol;
         if (query.iss) {
           try {
-            const issUrl = new URL(decodeURIComponent(query.iss));
-            host = `${issUrl.hostname}:3010`;
-            this.logger.debug(`Reconstructed callback host from iss: ${host}`);
+            proto = new URL(decodeURIComponent(query.iss)).protocol.replace(':', '');
           } catch (e) {
             this.logger.warn(`Failed to parse iss parameter: ${query.iss}`);
           }
         }
-        
-        // Reconstruire l'URL avec /oauth-callback au lieu de /api/v1/oauth/callback
-        // pour que le redirect_uri corresponde à celui envoyé lors de l'autorisation
+
+        // Reconstruire l'URL avec /oauth-callback (la PAGE frontend = redirect_uri de l'authorize)
+        // au lieu de /api/v1/oauth/callback, pour que le redirect_uri du token-exchange corresponde.
         const queryString = request.url.includes('?') ? request.url.substring(request.url.indexOf('?')) : '';
-        const fullUrl = `${request.protocol}://${host}/oauth-callback${queryString}`;
+        const fullUrl = `${proto}://${host}/oauth-callback${queryString}`;
         this.logger.debug(`Full callback URL (with frontend path): ${fullUrl}`);
 
         const dto: OAuthCallbackDto = {

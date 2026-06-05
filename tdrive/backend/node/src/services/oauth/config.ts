@@ -9,7 +9,7 @@ export const defaults: { oauth: OAuthConfig } = {
     clientSecret: process.env.OAUTH_CLIENT_SECRET || 'rdrive-secret-change-in-production',
     enabled: process.env.OAUTH_ENABLED !== 'false',
     // URL publique (doit correspondre à l'iss du token)
-    issuerUrl: process.env.OAUTH_ISSUER_URL || 'http://ryvie.local:3005/realms/ryvie',
+    issuerUrl: process.env.OAUTH_ISSUER_URL || 'http://ryvie.local/auth/realms/ryvie',
     scope: process.env.OAUTH_SCOPE || 'openid email profile',
     signingAlgorithm: process.env.OAUTH_SIGNING_ALGORITHM || 'RS256',
     profileSigningAlgorithm: process.env.OAUTH_PROFILE_SIGNING_ALGORITHM || 'none',
