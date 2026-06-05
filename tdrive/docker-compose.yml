@@ -5,7 +5,7 @@ services:
   # OnlyOffice Stack
   # ==========================================
   onlyoffice-rabbitmq:
-    image: julescloud/rdrive-rabbitmq:v0.0.0
+    image: julescloud/rdrive-rabbitmq:v0.0.0@sha256:4d7c7d4796fc154f50f2eae1b6ae7f7bd19f7e4aa2865ead26c0fb707dc081bc
     container_name: app-rdrive-rabbitmq
     hostname: onlyoffice-rabbitmq
     environment:
@@ -29,7 +29,7 @@ services:
       start_period: 10s
 
   onlyoffice-postgresql:
-    image: julescloud/rdrive-postgresql:v0.0.0
+    image: julescloud/rdrive-postgresql:v0.0.0@sha256:17520d7a95d7693469605ee28162f957ac26ba2d29a4d9331d01b2655aa5b0ac
     container_name: app-rdrive-postgresql
     hostname: onlyoffice-postgresql
     environment:
@@ -52,7 +52,7 @@ services:
       start_period: 10s
 
   onlyoffice:
-    image: julescloud/rdrive-onlyoffice:v0.0.0
+    image: julescloud/rdrive-onlyoffice:v0.0.0@sha256:85bbb3e375041cd8a9b4d9fe5b7d1a31ec34d1b50fd00be55dd4e15af9f388c6
     container_name: app-rdrive-onlyoffice
     hostname: onlyoffice
     ports:
@@ -89,7 +89,7 @@ services:
 
   onlyoffice-connector:
     container_name: app-rdrive-onlyoffice-connector
-    image: julescloud/rdrive-onlyoffice-connector:v0.1.0
+    image: julescloud/rdrive-onlyoffice-connector:v0.1.0@sha256:6efcd65d13cdd7abea5209a6200ce6538ce84ea45980f392dc79a7b624be8c46
     environment:
       - SERVER_PORT=5000
       - SERVER_PREFIX=/plugins/onlyoffice/
@@ -110,7 +110,7 @@ services:
   mongo:
     container_name: app-rdrive-mongo
     restart: unless-stopped
-    image: julescloud/rdrive-mongo:v0.0.0
+    image: julescloud/rdrive-mongo:v0.0.0@sha256:8338353797de553927861a7ff9e41c5f4beb272415dad65b8e22e2f377180edd
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
       interval: 10s
