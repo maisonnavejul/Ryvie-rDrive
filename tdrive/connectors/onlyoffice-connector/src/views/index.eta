@@ -19,14 +19,17 @@
         userimage: "<%= it.user_image %>"
       };
       window.mode = "<%= it.mode %>"
+      // baseURL : appels NAVIGATEUR -> connecteur (same-origin), ex: rename
       window.baseURL = `<%= it.server %>/${window.mode}/`;
+      // dsBaseURL : URLs consommées par le DOCUMENT SERVER (read + callback) -> URL interne robuste
+      window.dsBaseURL = `<%= it.ds_server %>/${window.mode}/`;
 
       $('#onlyoffice_container').html("<div id='onlyoffice_container_instance'></div>");
 
       const callbackQueryString = '?drive_file_id=<%= it.drive_file_id %>&company_id=<%= it.company_id %>&token=<%= it.token %>';
       let doc = {
         title: "<%= it.filename %>",
-        url: `${window.baseURL}read${callbackQueryString}`,
+        url: `${window.dsBaseURL}read${callbackQueryString}`,
         fileType: "<%= it.file_type %>",
         key: "<%= it.docId %>",
         permissions: {
@@ -110,7 +113,7 @@
           },
         },
         editorConfig: {
-          callbackUrl: `${window.baseURL}callback${callbackQueryString}`,
+          callbackUrl: `${window.dsBaseURL}callback${callbackQueryString}`,
           lang: window.user.language,
           user: {
             id: window.user.id,

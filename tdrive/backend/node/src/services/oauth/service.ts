@@ -32,7 +32,7 @@ export class OAuthService {
     const dynamicOauth = { ...oauth };
     try {
       const redirectUrl = new URL(dto.redirectUri);
-      dynamicOauth.issuerUrl = this.buildIssuerUrl(oauth.issuerUrl, redirectUrl.hostname);
+      dynamicOauth.issuerUrl = this.buildIssuerUrl(oauth.issuerUrl, redirectUrl.hostname, redirectUrl.protocol);
       this.logger.debug(`Using dynamic issuerUrl for authorize: ${dynamicOauth.issuerUrl}`);
     } catch (error: any) {
       this.logger.warn(`Invalid redirectUri, using default issuerUrl: ${error.message}`);
@@ -63,10 +63,10 @@ export class OAuthService {
 
       if (params.get('iss')) {
         const issUrl = new URL(params.get('iss')!);
-        dynamicOauth.issuerUrl = this.buildIssuerUrl(oauth.issuerUrl, issUrl.hostname);
+        dynamicOauth.issuerUrl = this.buildIssuerUrl(oauth.issuerUrl, issUrl.hostname, issUrl.protocol);
         this.logger.debug(`Using dynamic issuerUrl from iss parameter: ${dynamicOauth.issuerUrl}`);
       } else {
-        dynamicOauth.issuerUrl = this.buildIssuerUrl(oauth.issuerUrl, callbackUrl.hostname);
+        dynamicOauth.issuerUrl = this.buildIssuerUrl(oauth.issuerUrl, callbackUrl.hostname, callbackUrl.protocol);
         this.logger.debug(`Using dynamic issuerUrl from callback URL: ${dynamicOauth.issuerUrl}`);
       }
     } catch (error: any) {
@@ -169,8 +169,10 @@ export class OAuthService {
     if (request) {
       try {
         const hostname = request.hostname || request.headers?.host?.split(':')[0];
+        const protocol =
+          (request.headers?.['x-forwarded-proto'] || '').split(',')[0].trim() || request.protocol;
         if (hostname) {
-          dynamicOauth.issuerUrl = this.buildIssuerUrl(config.issuerUrl, hostname);
+          dynamicOauth.issuerUrl = this.buildIssuerUrl(config.issuerUrl, hostname, protocol);
           this.logger.debug(`Using dynamic issuerUrl for logout: ${dynamicOauth.issuerUrl}`);
         }
       } catch (error: any) {
@@ -184,9 +186,22 @@ export class OAuthService {
     return endpoint || LOGIN_URL;
   }
 
-  private buildIssuerUrl(templateUrl: string, hostname: string): string {
+  private buildIssuerUrl(templateUrl: string, hostname: string, protocol?: string): string {
     const url = new URL(templateUrl);
-    url.hostname = hostname;
+    const publicAuthHost = process.env.OAUTH_PUBLIC_HOST;
+    if (publicAuthHost && hostname && hostname.endsWith('.ryvie.fr')) {
+      // Accès public → Keycloak public canonique de la box.
+      url.hostname = publicAuthHost;
+      url.protocol = 'https:';
+      url.port = '';
+    } else {
+      // Accès LAN / tunnel (IP) → on garde l'hôte demandé → Keycloak local.
+      url.hostname = hostname;
+      if (protocol) {
+        url.protocol = protocol;
+        url.port = '';
+      }
+    }
     return url.toString().replace(/\/$/, '');
   }
 

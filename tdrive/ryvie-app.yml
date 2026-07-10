@@ -1,50 +1,20 @@
 manifestVersion: 1
 id: rdrive
-category: 
+category:
   fr: Stockage
   en: Storage
 name: rDrive
-version: "0.0.4"
-buildId: 20
+version: "0.0.7"
+buildId: 30
 port: 3010
 sso: true
-description: 
-  fr:
-    "rDrive est une solution de stockage de fichiers auto-hébergée, sécurisée et facile à utiliser.
-
-    Gérez, partagez et synchronisez vos fichiers en toute simplicité. Que ce soit pour un usage personnel ou professionnel, rDrive vous offre un espace de stockage fiable et accessible.
-
-    Ce que vous pouvez faire avec rDrive :
-
-    - Stocker et organiser vos fichiers
-
-    - Synchroniser vos données sur votre ryvie
-
-    - Accéder à vos fichiers depuis n'importe où
-
-    rDrive est conçu pour être simple, sécurisé et performant — vos données restent sous votre contrôle."
-
-  en:
-    "rDrive is a self-hosted, secure, and easy-to-use file storage solution.
-
-    Manage, share, and sync your files with ease. Whether for personal or professional use, rDrive provides you with a reliable and accessible storage space.
-
-    What you can do with rDrive:
-
-    - Store and organize your files
-
-    - Sync your data on your ryvie
-
-    - Access your files from anywhere
-
-    rDrive is designed to be simple, secure, and efficient — your data remains under your control."
-
-tagline: 
+description:
+  fr: "rDrive est une solution de stockage de fichiers auto-hébergée, sécurisée et facile à utiliser.\nGérez, partagez et synchronisez vos fichiers en toute simplicité. Que ce soit pour un usage personnel ou professionnel, rDrive vous offre un espace de stockage fiable et accessible.\nCe que vous pouvez faire avec rDrive :\n- Stocker et organiser vos fichiers\n- Synchroniser vos données sur votre ryvie\n- Accéder à vos fichiers depuis n'importe où\nrDrive est conçu pour être simple, sécurisé et performant — vos données restent sous votre contrôle."
+  en: "rDrive is a self-hosted, secure, and easy-to-use file storage solution.\nManage, share, and sync your files with ease. Whether for personal or professional use, rDrive provides you with a reliable and accessible storage space.\nWhat you can do with rDrive:\n- Store and organize your files\n- Sync your data on your ryvie\n- Access your files from anywhere\nrDrive is designed to be simple, secure, and efficient — your data remains under your control."
+tagline:
   fr: "Votre solution de stockage de fichiers auto-hébergée, sécurisée et facile à utiliser."
   en: "Your self-hosted, secure, and easy-to-use file storage solution."
-
 gallery:
-  - icon_.png
+  - icon_1.png
   - image1.png
   - image2.png
-  

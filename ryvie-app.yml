@@ -1,0 +1,19 @@
+# Recette Ryvie pour rDrive (Twake Drive + OnlyOffice).
+#
+# Bloc `ai` : connecte la partie OnlyOffice au gateway IA central (LiteLLM piloté
+# par Ryvie). OnlyOffice ne lit pas l'IA depuis un .env : sa config IA vit côté
+# Document Server (clé `aiSettings` de local.json). Les hooks ci-dessous écrivent
+# cette config et relancent le service. `restart: false` → Ryvie ne fait PAS de
+# `docker compose up` sur toute la stack rDrive ; le hook redémarre juste le
+# service docservice du Document Server (ciblé, sans couper les autres conteneurs).
+ai:
+  restart: false
+  # Le conteneur Document Server est rattaché au réseau IA dédié (ryvie-ai) → il joint
+  # LiteLLM par DNS (ryvie-litellm), indépendant de l'IP hôte, sans accès à l'infra
+  # sensible de ryvie-network. Rattachement géré par aiService (plus besoin de le faire
+  # dans le hook).
+  containers:
+    - app-rdrive-onlyoffice
+  hooks:
+    connect: ai/connect.sh
+    disconnect: ai/disconnect.sh

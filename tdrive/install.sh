@@ -117,6 +117,7 @@ LDAP_BIND_PASSWORD=$ldap_admin_password
 # Service OAuth centralisé (NE PAS MODIFIER)
 OAUTH_SERVICE_URL=https://cloudoauth-files.ryvie.fr
 INSTANCE_ID=$instance_id
+OAUTH_ISSUER_URL=http://ryvie.local/auth/realms/ryvie
 EOF
 
 # 6. Sécuriser le fichier .env
@@ -173,7 +174,7 @@ echo ""
 log "🧪 Test rclone (container app-rdrive-node)"
 echo "🧪 Test rclone (container app-rdrive-node)"
 if command -v docker >/dev/null 2>&1 && sudo docker ps --format '{{.Names}}' | grep -q '^app-rdrive-node$'; then
-    sudo docker exec -it app-rdrive-node sh -lc '/usr/bin/rclone version && /usr/bin/rclone --config /root/.config/rclone/rclone.conf listremotes -vv' || true
+    sudo docker exec -it app-rdrive-node sh -lc 'rclone version && rclone --config /root/.config/rclone/rclone.conf listremotes -vv' || true
 else
     log "ℹ️ Container app-rdrive-node non démarré (test container ignoré)"
     echo "ℹ️ Container app-rdrive-node non démarré (test container ignoré)"

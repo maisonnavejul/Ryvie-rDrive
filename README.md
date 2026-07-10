@@ -1,61 +1,65 @@
 # Ryvie rDrive
 
+**English** · [Français](README.fr.md)
+
+> Part of the [Ryvie](https://github.com/ryvieos/Ryvie) ecosystem, the self-hosted personal cloud OS. Learn more at [ryvie.fr](https://ryvie.fr).
+
 <p align="center">
   <img src="rDriveicon.png" alt="rDrive Logo" width="200" style="vertical-align: middle;">
 </p>
 
 <p align="center">
-  <b>Solution de stockage cloud open-source avec support OnlyOffice</b><br />
-  <i>Alternative auto-hébergée à Google Drive avec accès local et distant</i>
+  <b>Open-source, self-hosted cloud storage with OnlyOffice support</b><br />
+  <i>A Google Drive alternative for your personal cloud, with local and remote access</i>
 </p>
 
 <p align="center">
-  <a href="#-fonctionnalités">Fonctionnalités</a> •
+  <a href="#-features">Features</a> •
   <a href="#-architecture">Architecture</a> •
   <a href="#-installation">Installation</a> •
   <a href="#-configuration">Configuration</a> •
-  <a href="#-utilisation">Utilisation</a> •
-  <a href="#-sécurité">Sécurité</a>
+  <a href="#-usage">Usage</a> •
+  <a href="#-security">Security</a>
 </p>
 
 ---
 
-## Aperçu
+## Overview
 
-### Interface principale
+### Main interface
 
 <p align="center">
-  <img src="screenshots/rdrive-interface.png" alt="Interface rDrive" width="800">
+  <img src="screenshots/rdrive-interface.png" alt="rDrive interface" width="800">
   <br>
-  <i>Interface de gestion des fichiers avec navigation intuitive</i>
+  <i>File management interface with intuitive navigation</i>
 </p>
 
-### Éditeur OnlyOffice
+### OnlyOffice editor
 
 <p align="center">
-  <img src="screenshots/onlyoffice-editor.png" alt="Éditeur OnlyOffice" width="800">
+  <img src="screenshots/onlyoffice-editor.png" alt="OnlyOffice editor" width="800">
   <br>
-  <i>Édition collaborative de documents Excel avec OnlyOffice</i>
+  <i>Collaborative editing of Excel documents with OnlyOffice</i>
 </p>
 
 ---
 
-## 🚀 Fonctionnalités
+## 🚀 Features
 
-- **📁 Gestion de fichiers** : Upload, download, organisation en dossiers
-- **📝 Édition collaborative** : OnlyOffice intégré (Word, Excel, PowerPoint)
-- **🌐 Accès hybride** : Fonctionne en réseau local ET à distance via VPN
-- **🔄 Synchronisation** : Partage de fichiers entre utilisateurs
-- **🔐 Authentification** : Support LDAP et OAuth (Google, Dropbox)
-- **📱 Responsive** : Interface adaptée mobile et desktop
+- **📁 File management**: Upload, download, folder organization
+- **📝 Collaborative editing**: Integrated OnlyOffice (Word, Excel, PowerPoint)
+- **🌐 Hybrid access**: Works on the local network AND remotely via VPN
+- **🔄 Synchronization**: File sharing between users
+- **🔐 Authentication**: LDAP and OAuth support (Google, Dropbox)
+- **📱 Responsive**: Interface adapted to mobile and desktop
 
 ## 🏗️ Architecture
 
-### Mode d'accès automatique
+### Automatic access mode
 
-rDrive détecte automatiquement le mode d'accès et adapte sa configuration :
+rDrive automatically detects the access mode and adapts its configuration:
 
-#### **Mode Local** (réseau privé)
+#### **Local mode** (private network)
 ```
 Client (10.128.255.99)
     ↓
@@ -66,9 +70,9 @@ Backend (10.128.255.101:4000)
 OnlyOffice (10.128.255.101:8090)
 ```
 
-#### **Mode Remote** (via NetBird VPN)
+#### **Remote mode** (via NetBird VPN)
 ```
-Client distant
+Remote client
     ↓ NetBird VPN
 Frontend (100.104.214.194:3010)
     ↓
@@ -77,62 +81,62 @@ Backend (100.104.214.194:4000)
 OnlyOffice (100.104.214.194:8090)
 ```
 
-### Détection automatique
+### Automatic detection
 
-Le frontend détecte l'origine de la requête :
-- **Local** : IP `10.x`, `192.168.x`, `172.x`, `localhost`, `ryvie.local`
-- **Remote** : Toute autre IP (ex: NetBird `100.x`)
+The frontend detects the origin of the request:
+- **Local**: IP `10.x`, `192.168.x`, `172.x`, `localhost`, `ryvie.local`
+- **Remote**: Any other IP (e.g. NetBird `100.x`)
 
-Les URLs sont générées dynamiquement selon le contexte d'accès.
+URLs are generated dynamically according to the access context.
 
 ## 📦 Installation
 
-### Prérequis
+### Prerequisites
 
 - Docker & Docker Compose
 - 4 GB RAM minimum
-- 20 GB espace disque
-- (Optionnel) NetBird pour l'accès distant
+- 20 GB disk space
+- (Optional) NetBird for remote access
 
-### Étapes
+### Steps
 
-1. **Cloner le repository**
+1. **Clone the repository**
    ```bash
    git clone https://github.com/maisonnavejul/Ryvie-rDrive.git
    cd Ryvie-rDrive/tdrive
    ```
 
-2. **Configurer l'environnement**
+2. **Configure the environment**
    ```bash
    cp .env.example .env
    nano .env
    ```
 
-3. **Démarrer les services**
+3. **Start the services**
    ```bash
    docker compose up -d
    ```
 
-4. **Accéder à l'application**
-   - Local : `http://10.128.255.101:3010`
-   - Remote (NetBird) : `http://100.104.214.194:3010`
+4. **Access the application**
+   - Local: `http://10.128.255.101:3010`
+   - Remote (NetBird): `http://100.104.214.194:3010`
 
 ## ⚙️ Configuration
 
-### Fichier `.env`
+### `.env` file
 
 ```bash
-# URLs publiques (pour accès remote via NetBird)
+# Public URLs (for remote access via NetBird)
 REACT_APP_FRONTEND_URL=http://100.104.214.194:3010
 REACT_APP_BACKEND_URL=http://100.104.214.194:4000
 REACT_APP_WEBSOCKET_URL=ws://100.104.214.194:4000/ws
 REACT_APP_ONLYOFFICE_CONNECTOR_URL=http://100.104.214.194:5000
 REACT_APP_ONLYOFFICE_DOCUMENT_SERVER_URL=http://100.104.214.194:8090
 
-# IP privée pour détection locale
+# Private IP for local detection
 REACT_APP_FRONTEND_URL_PRIVATE=10.128.255.101
 
-# Secrets (générer des valeurs aléatoires sécurisées)
+# Secrets (generate secure random values)
 LDAP_BIND_PASSWORD=your_secure_password
 DROPBOX_APPKEY=your_dropbox_key
 DROPBOX_APPSECRET=your_dropbox_secret
@@ -140,9 +144,9 @@ GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
 ```
 
-### Configuration OnlyOffice
+### OnlyOffice configuration
 
-Le connecteur OnlyOffice est configuré dans `docker-compose.yml` :
+The OnlyOffice connector is configured in `docker-compose.yml`:
 
 ```yaml
 onlyoffice-connector:
@@ -151,72 +155,72 @@ onlyoffice-connector:
     - ONLY_OFFICE_SERVER=http://localhost:8090/
 ```
 
-Ces URLs utilisent `localhost` car le connecteur est en mode `network_mode: host`, permettant l'accès aux services locaux même si NetBird est arrêté.
+These URLs use `localhost` because the connector runs in `network_mode: host`, allowing access to local services even when NetBird is stopped.
 
-## 🎯 Utilisation
+## 🎯 Usage
 
-### Accès Local (sans NetBird)
+### Local access (without NetBird)
 
-1. Accéder à `http://10.128.255.101:3010`
-2. Se connecter avec vos identifiants
-3. Tous les services fonctionnent via le réseau local
+1. Go to `http://10.128.255.101:3010`
+2. Log in with your credentials
+3. All services work over the local network
 
-### Accès Remote (avec NetBird)
+### Remote access (with NetBird)
 
-1. Démarrer NetBird : `sudo systemctl start netbird`
-2. Accéder à `http://100.104.214.194:3010`
-3. Les services sont accessibles via le VPN
+1. Start NetBird: `sudo systemctl start netbird`
+2. Go to `http://100.104.214.194:3010`
+3. Services are accessible via the VPN
 
-### Gestion NetBird
+### NetBird management
 
 ```bash
-# Démarrer NetBird
+# Start NetBird
 sudo systemctl start netbird
 
-# Arrêter NetBird (l'accès local continue de fonctionner)
+# Stop NetBird (local access keeps working)
 sudo systemctl stop netbird
 
-# Redémarrer NetBird
+# Restart NetBird
 sudo systemctl restart netbird
 
-# Statut
+# Status
 sudo systemctl status netbird
 ```
 
-## 🔐 Sécurité
+## 🔐 Security
 
-### Points forts
+### Strengths
 
-✅ **Authentification JWT** : Tokens avec expiration automatique  
-✅ **Séparation des tokens** : Access, refresh, et in_page_token distincts  
-✅ **Pas de credentials en clair** : Variables d'environnement sécurisées  
-✅ **CORS automatique** : Détection d'origine et headers adaptés  
-✅ **VPN chiffré** : NetBird pour l'accès distant sécurisé  
+✅ **JWT authentication**: Tokens with automatic expiration  
+✅ **Token separation**: Distinct access, refresh, and in_page_token  
+✅ **No plaintext credentials**: Secure environment variables  
+✅ **Automatic CORS**: Origin detection and adapted headers  
+✅ **Encrypted VPN**: NetBird for secure remote access  
 
-### Recommandations
+### Recommendations
 
-⚠️ **Ne jamais commiter le fichier `.env`** (déjà dans `.gitignore`)  
-⚠️ **Utiliser des mots de passe forts** pour LDAP et autres services  
-⚠️ **Activer HTTPS** en production avec Let's Encrypt  
-⚠️ **Mettre à jour régulièrement** les images Docker  
+⚠️ **Never commit the `.env` file** (already in `.gitignore`)  
+⚠️ **Use strong passwords** for LDAP and other services  
+⚠️ **Enable HTTPS** in production with Let's Encrypt  
+⚠️ **Update regularly** the Docker images  
 
-### Configuration HTTPS (Production)
+### HTTPS configuration (Production)
 
-Pour activer HTTPS avec Let's Encrypt :
+To enable HTTPS with Let's Encrypt:
 
 ```bash
-# Dans docker-compose.yml, modifier le frontend
+# In docker-compose.yml, edit the frontend
 environment:
   - SSL_CERTS=on
-  - DOMAIN=votre-domaine.com
+  - DOMAIN=your-domain.com
 
-# Redémarrer
+# Restart
 docker compose restart frontend
 ```
 
-## 🛠️ Développement
+## 🛠️ Development
 
-### Lancer le frontend en mode dev
+### Run the frontend in dev mode
 
 ```bash
 cd tdrive/frontend
@@ -224,94 +228,94 @@ npm install
 DISABLE_ESLINT_PLUGIN=true BROWSER=none npm run dev:start
 ```
 
-Le frontend sera disponible sur `http://localhost:3000`
+The frontend will be available at `http://localhost:3000`
 
-### Rebuild d'un service
+### Rebuild a service
 
 ```bash
-# Rebuild du frontend
+# Rebuild the frontend
 docker compose up -d --build frontend
 
-# Rebuild du connecteur OnlyOffice
+# Rebuild the OnlyOffice connector
 docker compose up -d --build onlyoffice-connector
 
-# Rebuild de tous les services
+# Rebuild all services
 docker compose up -d --build
 ```
 
 ### Logs
 
 ```bash
-# Tous les services
+# All services
 docker compose logs -f
 
-# Service spécifique
+# Specific service
 docker compose logs -f frontend
 docker compose logs -f node
 docker compose logs -f onlyoffice-connector
 ```
 
-## 🐛 Dépannage
+## 🐛 Troubleshooting
 
-### OnlyOffice ne charge pas les fichiers
+### OnlyOffice does not load files
 
-**Symptôme** : "Échec du téléchargement" ou "Impossible d'enregistrer"
+**Symptom**: "Download failed" or "Unable to save"
 
-**Solution** : Vérifier que le connecteur utilise les bonnes URLs
+**Solution**: Check that the connector uses the correct URLs
 ```bash
 docker compose logs onlyoffice-connector | grep "Connector Server URL"
 ```
 
-### NetBird ne démarre pas
+### NetBird does not start
 
-**Solution** : Vérifier le statut et les logs
+**Solution**: Check the status and logs
 ```bash
 sudo systemctl status netbird
 sudo journalctl -u netbird -f
 ```
 
-### Services ne démarrent pas
+### Services do not start
 
-**Solution** : Vérifier les dépendances et la santé des conteneurs
+**Solution**: Check the dependencies and container health
 ```bash
 docker compose ps
 docker compose logs
 ```
 
-## 📊 Architecture Technique
+## 📊 Technical Architecture
 
 ### Stack
 
-- **Frontend** : React + TypeScript
-- **Backend** : Node.js + Express
-- **Base de données** : MongoDB
-- **Stockage** : Local filesystem (configurable S3)
-- **Édition** : OnlyOffice Document Server
-- **Authentification** : JWT + LDAP/OAuth
-- **VPN** : NetBird (WireGuard)
+- **Frontend**: React + TypeScript
+- **Backend**: Node.js + Express
+- **Database**: MongoDB
+- **Storage**: Local filesystem (S3 configurable)
+- **Editing**: OnlyOffice Document Server
+- **Authentication**: JWT + LDAP/OAuth
+- **VPN**: NetBird (WireGuard)
 
 ### Ports
 
 | Service | Port | Description |
 |---------|------|-------------|
-| Frontend | 3010 | Interface web |
-| Backend | 4000 | API REST + WebSocket |
-| OnlyOffice Connector | 5000 | Pont OnlyOffice ↔ Backend |
-| OnlyOffice Server | 8090 | Serveur de documents |
-| MongoDB | 27017 | Base de données |
-| RabbitMQ | 5672 | Queue OnlyOffice |
-| PostgreSQL | 5433 | DB OnlyOffice |
+| Frontend | 3010 | Web interface |
+| Backend | 4000 | REST API + WebSocket |
+| OnlyOffice Connector | 5000 | OnlyOffice ↔ Backend bridge |
+| OnlyOffice Server | 8090 | Document server |
+| MongoDB | 27017 | Database |
+| RabbitMQ | 5672 | OnlyOffice queue |
+| PostgreSQL | 5433 | OnlyOffice DB |
 
 ## 📝 License
 
-Ce projet est basé sur [Twake Drive](https://github.com/linagora/twake-drive) et est distribué sous licence [AGPL v3](LICENSE).
+This project is based on [Twake Drive](https://github.com/linagora/twake-drive) and is distributed under the [AGPL v3](LICENSE) license.
 
-## 🤝 Contribution
+## 🤝 Contributing
 
-Les contributions sont les bienvenues ! N'hésitez pas à ouvrir une issue ou une pull request.
+Contributions are welcome! Feel free to open an issue or a pull request.
 
 ---
 
 <p align="center">
-  Fait avec ❤️ par <a href="https://github.com/ryvieos">Ryvie</a>
+  Made with ❤️ by <a href="https://github.com/ryvieos">Ryvie</a>
 </p>
